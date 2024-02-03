@@ -1,0 +1,35 @@
+template <Numeric T>
+    std::ostream &print_array(std::ostream &os, const T *data, unsigned int rank, const ull_t *_sizes,
+                              unsigned int max_rank, unsigned int spaces = 0) {
+        if (!_sizes || !*_sizes)
+            return os << "[]";
+        // printf("Pointer initial: %p\n\n", data);
+        ull_t num_elems = *_sizes;
+        unsigned int counter = spaces;
+        while (counter --> 0)
+            os << ' ';
+        os << '[';
+        if (rank == 1) {
+            goto start;
+            while (--num_elems > 0) {
+                os << " ";
+                start:
+                os << +(*data++);
+            }
+        } else {
+            unsigned int next_rank = rank - 1;
+            const ull_t *next_dim = _sizes + 1;
+            print_array(os, data, next_rank, next_dim, max_rank, 0);
+            data += *next_dim;
+            --num_elems;
+            // goto start_;
+            while (num_elems-- > 0) {
+                os << '\n';
+                // start_:
+                print_array(os, data, next_rank, next_dim, max_rank, 1 + max_rank - rank);
+                data += *next_dim;
+            }
+        }
+        // printf("Pointer final: %p\n\n", data);
+        return os << ']';
+    }

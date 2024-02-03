@@ -1,0 +1,24 @@
+Things to add or be aware of in my ML frameworks:
+
+- Read/write a tensor from/to a binary .tsr file (header should contain sizes of data types and shape)
+- Must finish writing out_of_bounds_error class and use it when an invalid index is provided to a tensor
+- IMPORTANT: for matrix multiplication - or perhaps for any operation on an N-dimensional tensor where you are iterating through all or many of the tensor's elements - do NOT use the offset_at function. Instead declare a `T *ptr = data.data();` to access each element, one after the other, AND THEN have various loops (over i,j,k), incremeting ptr each time in the deepest loop (or something like this, you'll figure it out). For the N-dimensional tensors, you could allocate an array of counters - one for each dimension - and then increment each one when you move one unit along that dimension (that could perhaps be done using `if (counter % N == 0)`), and thus you only have one loop for incrementing `ptr`.
+- To the `tensor` class, add a `merge` and/or `append` method which adds another tensor onto the current (whether it be in place or 
+to result in a new tensor) - have to find a way of specifying the axis, i.e., for a 1D tensor (a vector) you can only append another 
+1D tensor either before the first element or after the last one, but for a 2D tensor (a matrix) you could append another matrix 
+(dimensions allowing) "below", "above", "to the left" or "to the right" of the matrix you are adding it to
+- Instead of making a `vector` class (derived from `matrix`, which is derived from `tensor`), consider making `vector` a sibling to 
+`matrix` (i.e., both derive from `tensor`), but infer whether it is a row or column vector from the matrix it is being multiplied by 
+(in matrix multiplication, at least)
+- Have a `gml::tensor<T>::flatten()` method, which (VERY SIMPLY) changes the shape of the tensor to be a 1D tensor (no changes need to be made in memory since all elements are already stored contiguously)
+- If `gml::vector<T>` does inherit from `gml::tensor<T>`, allow a `gml::vector<T>` to be assigned or constructed from a 1D tensor (or a 2D tensor column or row vector)
+- If `gml::matrix<T>` does inherit from `gml::tensor<T>`, allow a `gml::matrix<T>` to be assigned or constructed from a 2D tensor
+- Add a `gml::lstsq` function
+- Possibly overload the `new` operator (conditionally according to a preprocessor macro) such that it records how much memory has been allocated in total (by adding to a static variable in the overloaded `template <typename T>T* operator new(size_t)` function)
+- Consider removing the `std::vector<T>` from `gml::tensor<T>` and performing memory allocation manually, this would 
+allow the memory block to be shrunk if required (such as when reducing the size of the tensor)
+- Add a `flatten` method to `gml::tensor<T>`, with the number of dimensions flattened as a paramater (if `0`, for 
+example, flatten all the dimensions into a 1D tensor)
+- Write a `gml::tensor<T>::bytes_used` method
+- Write `gml::distance` for the distance between two vectors (1D tensors)
+
