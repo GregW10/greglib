@@ -206,6 +206,7 @@ namespace gml {
             }
         }
         explicit tensor_shape(bool alloc = true) {
+            std::cout << "\n-----------\nDefault tensor_shape ctor being called.\n-------------" << std::endl;
             if (alloc)
                 this->_s = new ull_t[0];
         }
@@ -303,6 +304,10 @@ namespace gml {
         friend std::ostream &operator<<(std::ostream&, const tensor_shape&);
         template <Numeric T>
         friend class tensor;
+        template <Numeric T>
+        friend class matrix;
+        template <Numeric T>
+        friend class vector;
         friend bool operator==(const tensor_shape&, const tensor_shape&);
         friend bool operator!=(const tensor_shape&, const tensor_shape&);
         template <Numeric U>
@@ -348,7 +353,7 @@ namespace gml {
          *       tensor of order 0 by the `data` pointer being `nullptr`.
          *     - The `begin` and `end` operations are still well-defined for empty `tensor` objects.
          * */
-    private:
+    protected:
         T *data{};
         tensor_shape _shape{};
         ull_t vol{};
@@ -455,6 +460,7 @@ namespace gml {
             in.read((char *) this->data, arr_size);
             in.close();
         }
+        explicit tensor(bool alloc) : data{}, vol{0}, _shape(alloc) {}
     public:
         static inline std::streamsize precision = 6; // default precision of output streams, as per the C++ standard
         tensor() : data{}, vol{0} {} // constructs an empty tensor
@@ -547,6 +553,37 @@ namespace gml {
         friend bool operator!=(const tensor<U>&, const tensor<V>&);
     };
     template <Numeric T>
+    class matrix : public tensor<T> {
+    public:
+        matrix() = default;
+        matrix(const std::initializer_list<std::initializer_list<T>> &li) : tensor<T>{false} {
+            typename std::initializer_list<T>::size_type li_size = li.size();
+            tensor<T>::_shape._r = 2; // rank will always be 2 for a matrix
+            tensor<T>::_shape._s = new ull_t[2]{}; // default initialised to zeros
+            tensor<T>::_shape.sizes = new ull_t[1]{}; // zero
+            if (!li_size) {
+                return;
+            }
+            const std::initializer_list<T> *ptr = li.begin();
+            typename std::initializer_list<T>::size_type sub_elems = ptr->size();
+            if (!sub_elems)
+                return;
+            tensor<T>::_shape._s[0] = li_size;
+            tensor<T>::_shape._s[1] = sub_elems;
+            tensor<T>::vol = li_size*sub_elems;
+            tensor<T>::data = new T[tensor<T>::vol];
+            T *dptr = tensor<T>::data;
+            while (--li_size > 0) {
+                if (ptr->size() != sub_elems) {
+                    delete [] tensor<T>::data; // is this safe?
+                    throw std::invalid_argument{"Error: sizes of nested initializer lists do not match.\n"};
+                }
+                memcopy(dptr++, ptr++->begin(), sizeof(T), sub_elems);
+            }
+            tensor<T>::_shape.sizes[0] = sub_elems;
+        }
+    };
+    template <Numeric T>
     std::ostream &operator<<(std::ostream &os, const tensor<T> &tens) {
         std::streamsize prev_width = os.width();
         std::streamsize max_w;
@@ -557,7 +594,7 @@ namespace gml {
                                    tens._shape._r);
             os.precision(prev_prec);
         } else {
-            max_w = tensor<T>::max_width(tens.data, tens.vol, tensor<T>::precision);
+            max_w = tensor<T>::max_width(tens.data, tens.vol);//, tensor<T>::precision);
             tensor<T>::print_array(os, max_w, tens.data, tens._shape._r, tens._shape._s, tens._shape.sizes,
                                    tens._shape._r);
         }

@@ -8,8 +8,18 @@ namespace gml {
     concept Numeric = requires (T value) {
         T{1};
     };
+    class crap {
+        int g{};
+    public:
+        crap() = default;
+        crap(int a) : g{a} {}
+        template <Numeric T>
+        friend class tensor;
+    };
     template <Numeric T>
     class tensor {
+    protected:
+        crap c{};
     public:
         class shape {
         public:
@@ -22,6 +32,16 @@ namespace gml {
         };
         tensor() {
             std::cout << "tensor ctor" << std::endl;
+        }
+        void other() {
+            std::cout << this->c.g << std::endl;
+        }
+    };
+    template <Numeric T>
+    class matrix : public tensor<T> {
+    public:
+        void something() {
+            std::cout << this->c.g << std::endl;
         }
     };
     template <Numeric U>
@@ -47,5 +67,7 @@ int main() {
     std::cout << 98 << ", " << 987 << ", " << 9876 << std::endl;
     std::cout << 987654321 << std::endl;
     std::cout << 1234546.123456l << std::endl;
+    gml::matrix<int> m;
+    m.other();
     return 0;
 }

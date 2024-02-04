@@ -1,4 +1,4 @@
-/Users/gregorhartlwatters/both/gregml/cmake-build-debug/CMakeFiles/rebuild_cache.dir
-/Users/gregorhartlwatters/both/gregml/cmake-build-debug/CMakeFiles/edit_cache.dir
-/Users/gregorhartlwatters/both/gregml/cmake-build-debug/CMakeFiles/test.dir
-/Users/gregorhartlwatters/both/gregml/cmake-build-debug/CMakeFiles/main.dir
+/Users/gregorhartlwatters/greglib/ml/cmake-build-debug/CMakeFiles/rebuild_cache.dir
+/Users/gregorhartlwatters/greglib/ml/cmake-build-debug/CMakeFiles/edit_cache.dir
+/Users/gregorhartlwatters/greglib/ml/cmake-build-debug/CMakeFiles/test.dir
+/Users/gregorhartlwatters/greglib/ml/cmake-build-debug/CMakeFiles/main.dir

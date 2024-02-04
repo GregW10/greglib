@@ -1,6 +1,6 @@
 Things to add or be aware of in my ML frameworks:
 
-- Read/write a tensor from/to a binary .tsr file (header should contain sizes of data types and shape)
+- Add in o/f/i field to .tsr file
 - Must finish writing out_of_bounds_error class and use it when an invalid index is provided to a tensor
 - IMPORTANT: for matrix multiplication - or perhaps for any operation on an N-dimensional tensor where you are iterating through all or many of the tensor's elements - do NOT use the offset_at function. Instead declare a `T *ptr = data.data();` to access each element, one after the other, AND THEN have various loops (over i,j,k), incremeting ptr each time in the deepest loop (or something like this, you'll figure it out). For the N-dimensional tensors, you could allocate an array of counters - one for each dimension - and then increment each one when you move one unit along that dimension (that could perhaps be done using `if (counter % N == 0)`), and thus you only have one loop for incrementing `ptr`.
 - To the `tensor` class, add a `merge` and/or `append` method which adds another tensor onto the current (whether it be in place or 

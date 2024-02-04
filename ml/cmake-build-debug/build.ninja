@@ -39,13 +39,13 @@ include CMakeFiles/rules.ninja
 #############################################
 # Logical path to working directory; prefix for absolute paths.
 
-cmake_ninja_workdir = /Users/gregorhartlwatters/both/gregml/cmake-build-debug/
+cmake_ninja_workdir = /Users/gregorhartlwatters/greglib/ml/cmake-build-debug/
 
 #############################################
 # Utility command for rebuild_cache
 
 build CMakeFiles/rebuild_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /Users/gregorhartlwatters/both/gregml/cmake-build-debug && /Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake --regenerate-during-build -S/Users/gregorhartlwatters/both/gregml -B/Users/gregorhartlwatters/both/gregml/cmake-build-debug
+  COMMAND = cd /Users/gregorhartlwatters/greglib/ml/cmake-build-debug && /Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake --regenerate-during-build -S/Users/gregorhartlwatters/greglib/ml -B/Users/gregorhartlwatters/greglib/ml/cmake-build-debug
   DESC = Running CMake to regenerate build system...
   pool = console
   restat = 1
@@ -57,7 +57,7 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 # Utility command for edit_cache
 
 build CMakeFiles/edit_cache.util: CUSTOM_COMMAND
-  COMMAND = cd /Users/gregorhartlwatters/both/gregml/cmake-build-debug && /Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
+  COMMAND = cd /Users/gregorhartlwatters/greglib/ml/cmake-build-debug && /Applications/CLion.app/Contents/bin/cmake/mac/bin/cmake -E echo No\ interactive\ CMake\ dialog\ available.
   DESC = No interactive CMake dialog available...
   restat = 1
 
@@ -72,10 +72,10 @@ build edit_cache: phony CMakeFiles/edit_cache.util
 
 build cmake_object_order_depends_target_test: phony || CMakeFiles/test.dir
 
-build CMakeFiles/test.dir/test.cpp.o: CXX_COMPILER__test_Debug /Users/gregorhartlwatters/both/gregml/test.cpp || cmake_object_order_depends_target_test
+build CMakeFiles/test.dir/test.cpp.o: CXX_COMPILER__test_Debug /Users/gregorhartlwatters/greglib/ml/test.cpp || cmake_object_order_depends_target_test
   DEP_FILE = CMakeFiles/test.dir/test.cpp.o.d
   FLAGS = -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX12.3.sdk -mmacosx-version-min=12.0 -std=gnu++2a
-  INCLUDES = -I/Users/gregorhartlwatters/both/gregml/.
+  INCLUDES = -I/Users/gregorhartlwatters/greglib/ml/.
   OBJECT_DIR = CMakeFiles/test.dir
   OBJECT_FILE_DIR = CMakeFiles/test.dir
   TARGET_COMPILE_PDB = CMakeFiles/test.dir/
@@ -107,10 +107,10 @@ build test: CXX_EXECUTABLE_LINKER__test_Debug CMakeFiles/test.dir/test.cpp.o
 
 build cmake_object_order_depends_target_main: phony || CMakeFiles/main.dir
 
-build CMakeFiles/main.dir/main.cpp.o: CXX_COMPILER__main_Debug /Users/gregorhartlwatters/both/gregml/main.cpp || cmake_object_order_depends_target_main
+build CMakeFiles/main.dir/main.cpp.o: CXX_COMPILER__main_Debug /Users/gregorhartlwatters/greglib/ml/main.cpp || cmake_object_order_depends_target_main
   DEP_FILE = CMakeFiles/main.dir/main.cpp.o.d
   FLAGS = -g -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX12.3.sdk -mmacosx-version-min=12.0 -std=gnu++2a
-  INCLUDES = -I/Users/gregorhartlwatters/both/gregml/.
+  INCLUDES = -I/Users/gregorhartlwatters/greglib/ml/.
   OBJECT_DIR = CMakeFiles/main.dir
   OBJECT_FILE_DIR = CMakeFiles/main.dir
   TARGET_COMPILE_PDB = CMakeFiles/main.dir/
@@ -142,7 +142,7 @@ build main: CXX_EXECUTABLE_LINKER__main_Debug CMakeFiles/main.dir/main.cpp.o
 # =============================================================================
 
 #############################################
-# Folder: /Users/gregorhartlwatters/both/gregml/cmake-build-debug
+# Folder: /Users/gregorhartlwatters/greglib/ml/cmake-build-debug
 
 build all: phony test main
 

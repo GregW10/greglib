@@ -20,5 +20,8 @@ int main() {
     gml::tens_i i1 = {{1, 2, 3, 4}, {4}};
     gml::tens_f i2 = {{1, 2, 3, 4}, {4}};
     std::cout << "i1 == i2: " << (i1 == i2) << std::endl;
+    gml::matrix<int> mat{{{1, 2, 3}, {4, 5, 6}, {7, 8, 9}}};
+    // gml::tensor<int> mat{{1, 2, 3, 4, 5, 6, 7, 8, 9}, {3, 3}};
+    std::cout << "Matrix:\n" << mat << std::endl;
     return 0;
 }
