@@ -21,4 +21,6 @@ allow the memory block to be shrunk if required (such as when reducing the size 
 example, flatten all the dimensions into a 1D tensor)
 - Write a `gml::tensor<T>::bytes_used` method
 - Write `gml::distance` for the distance between two vectors (1D tensors)
+- euc2norm for `gml::tensor<T>`
+
 
