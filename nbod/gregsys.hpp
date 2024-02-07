@@ -197,8 +197,10 @@ namespace gtd {
             std::set<std::pair<uint64_t, bod_t>, decltype(pair_bods_func)> *del_bods_m;
         };
 #endif
+#ifdef GREGSYS_SOFTENING
         long double eps = 0; // softening
         long double eps_sq = eps*eps;
+#endif
         long double dt = 1;
         long double half_dt = dt/2; // I gave it its own variable, since it is a commonly used quantity
         uint64_t iterations = 1'000;
@@ -341,41 +343,72 @@ namespace gtd {
             }
         }
         void cumulative_acc_and_pe(bod_t &b1, bod_t &b2) requires (memFreq != 0) {
+#ifdef GREGSYS_SOFTENING
+            vector3D<T> &&r12_uvec = (b2.curr_pos - b1.curr_pos).unit_vector();
+            auto &&r12_sq = r12*r12 + this->eps_sq; // square of Euclidean distance in "4D" space
+            b1.acc += ((G*b2.mass_)/(r12_sq))*r12_uvec;
+            b2.acc -= ((G*b1.mass_)/(r12_sq))*r12_uvec;
+            auto &&pot_energy = -(G*b1.mass_*b2.mass_)/sqrtl(r12_sq);
+#else
             vector3D<T> &&r12 = b2.curr_pos - b1.curr_pos;
             long double &&r12_cubed_mag = (r12*r12*r12).magnitude();
             b1.acc += ((G*b2.mass_)/(r12_cubed_mag))*r12;
             b2.acc -= ((G*b1.mass_)/(r12_cubed_mag))*r12;
             auto &&pot_energy = -(G*b1.mass_*b2.mass_)/r12.magnitude();
+#endif
             b1.pe += pot_energy;
             b2.pe += pot_energy;
         }
         void cumulative_acc(bod_t &b1, bod_t &b2) {
+#ifdef GREGSYS_SOFTENING
+            vector3D<T> &&r12_uvec = (b2.curr_pos - b1.curr_pos).unit_vector();
+            auto &&r12_sq = r12*r12 + this->eps_sq; // square of Euclidean distance in "4D" space
+            b1.acc += ((G*b2.mass_)/(r12_sq))*r12_uvec;
+            b2.acc -= ((G*b1.mass_)/(r12_sq))*r12_uvec;
+#else
             vector3D<T> &&r12 = b2.curr_pos - b1.curr_pos;
             long double &&r12_cubed_mag = (r12*r12*r12).magnitude();
             b1.acc += ((G*b2.mass_)/(r12_cubed_mag))*r12;
             b2.acc -= ((G*b1.mass_)/(r12_cubed_mag))*r12;
+#endif
         }
         void cumulative_pe(bod_t &b1, bod_t &b2) requires (memFreq != 0) {
             vector3D<T> &&r12 = b2.curr_pos - b1.curr_pos;
+#ifdef GREGSYS_SOFTENING
+            auto &&pot_energy = -(G*b1.mass_*b2.mass_)/sqrtl(r12*r12 + this->eps_sq);
+#else
             auto &&pot_energy = -(G*b1.mass_*b2.mass_)/r12.magnitude();
+#endif
             b1.pe += pot_energy;
             b2.pe += pot_energy;
         }
         void bh_acc_and_pe(bod_t *_bod, const cube_t *_src) requires (memFreq != 0) {
             vec_t &&r12 = _src->_com - _bod->curr_pos;
+#ifdef GREGSYS_SOFTENING
             auto &&r12_sq = r12*r12 + eps_sq;
+#else
+            auto &&r12_sq = r12*r12;
+#endif
             auto &&r12_mag = sqrtl(r12_sq);
             _bod->acc = this->G*(_src->_mass/(r12_sq))*(r12/r12_mag);
             _bod->pe -= -(G*_bod->mass_*_src->_mass)/r12_mag;
         }
         void bh_acc(bod_t *_bod, const cube_t *_src) {
             vec_t &&r12 = _src->_com - _bod->curr_pos;
+#ifdef GREGSYS_SOFTENING
             auto &&r12_sq = r12*r12 + eps_sq;
+#else
+            auto &&r12_sq = r12*r12;
+#endif
             _bod->acc = this->G*(_src->_mass/(r12_sq))*(r12/(sqrtl(r12_sq)));
         }
         void bh_pe(bod_t *_bod, const cube_t *_src) requires (memFreq != 0) {
             vector3D<T> &&r12 = _src->_com - _bod->curr_pos;
+#ifdef GREGSYS_SOFTENING
             _bod->pe -= (G*_bod->mass_*_src->_mass)/(sqrtl(r12*r12 + eps_sq));
+#else
+            _bod->pe -= (G*_bod->mass_*_src->_mass)/r12.magnitude();//sqrtl(r12*r12);
+#endif
         }
         template <bool mem, bool file>
         void take_euler_step() {
@@ -1657,13 +1690,15 @@ namespace gtd {
                                             std::is_fundamental_v<T> && CHAR_BIT == 8) {
             return nsys_file_size(this->bods.size());
         }
+#ifdef GREGSYS_SOFTENING
         bool set_softening(long double _epsilon) noexcept {
             if (_epsilon < sqrtl(std::numeric_limits<long double>::min()))
                 return false;
             eps = _epsilon;
-            eps_sq = _epsilon*_epsilon;
+            eps_sq = _epsilon*_epsilon; // perhaps check this too
             return true;
         }
+#endif
         bool set_bh_opening_angle(long double _theta) {
             if (_theta < 0 || _theta >= PI)
                 return false;
