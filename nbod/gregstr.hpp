@@ -1,8 +1,8 @@
 // Copyright (c) 2023 Gregor Anton Randall Hartl Watters
 // This software is protected under the MIT license. Please see the LICENSE file for more information.
 
-#ifndef GREGSTRING_H
-#define GREGSTRING_H
+#ifndef GREGSTR_HPP
+#define GREGSTR_HPP
 
 //
 // Created by Gregor Hartl Watters on 04/04/2022.

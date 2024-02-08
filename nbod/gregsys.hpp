@@ -1,8 +1,8 @@
 /* Copyright (c) 2023 Gregor Anton Randall Hartl Watters
  * This software is protected under the MIT license. Please see the LICENSE file for more information. */
 
-#ifndef GREGSYS_H
-#define GREGSYS_H
+#ifndef GREGSYS_HPP
+#define GREGSYS_HPP
 
 #ifndef __cplusplus
 #error "The gregsys.hpp header file is a C++ header file only.\n"
@@ -343,14 +343,16 @@ namespace gtd {
             }
         }
         void cumulative_acc_and_pe(bod_t &b1, bod_t &b2) requires (memFreq != 0) {
-#ifdef GREGSYS_SOFTENING
-            vector3D<T> &&r12_uvec = (b2.curr_pos - b1.curr_pos).unit_vector();
-            auto &&r12_sq = r12*r12 + this->eps_sq; // square of Euclidean distance in "4D" space
-            b1.acc += ((G*b2.mass_)/(r12_sq))*r12_uvec;
-            b2.acc -= ((G*b1.mass_)/(r12_sq))*r12_uvec;
-            auto &&pot_energy = -(G*b1.mass_*b2.mass_)/sqrtl(r12_sq);
-#else
             vector3D<T> &&r12 = b2.curr_pos - b1.curr_pos;
+#ifdef GREGSYS_SOFTENING
+            // vector3D<T> &&r12_uvec = r12.unit_vector();
+            auto &&r12_sq = r12*r12;
+            auto &&r12_sq_eps = r12_sq + this->eps_sq; // square of Euclidean distance in "4D" space
+            r12 /= sqrtl(r12_sq);
+            b1.acc += ((G*b2.mass_)/(r12_sq_eps))*r12;//_uvec;
+            b2.acc -= ((G*b1.mass_)/(r12_sq_eps))*r12;//_uvec;
+            auto &&pot_energy = -(G*b1.mass_*b2.mass_)/sqrtl(r12_sq_eps);
+#else
             long double &&r12_cubed_mag = (r12*r12*r12).magnitude();
             b1.acc += ((G*b2.mass_)/(r12_cubed_mag))*r12;
             b2.acc -= ((G*b1.mass_)/(r12_cubed_mag))*r12;
@@ -360,13 +362,15 @@ namespace gtd {
             b2.pe += pot_energy;
         }
         void cumulative_acc(bod_t &b1, bod_t &b2) {
-#ifdef GREGSYS_SOFTENING
-            vector3D<T> &&r12_uvec = (b2.curr_pos - b1.curr_pos).unit_vector();
-            auto &&r12_sq = r12*r12 + this->eps_sq; // square of Euclidean distance in "4D" space
-            b1.acc += ((G*b2.mass_)/(r12_sq))*r12_uvec;
-            b2.acc -= ((G*b1.mass_)/(r12_sq))*r12_uvec;
-#else
             vector3D<T> &&r12 = b2.curr_pos - b1.curr_pos;
+#ifdef GREGSYS_SOFTENING
+            // vector3D<T> &&r12_uvec = r12.unit_vector();
+            auto &&r12_sq = r12*r12;
+            r12 /= r12.magnitude();
+            auto &&r12_sq_eps = r12_sq + this->eps_sq; // square of Euclidean distance in "4D" space
+            b1.acc += ((G*b2.mass_)/(r12_sq_eps))*r12;//_uvec;
+            b2.acc -= ((G*b1.mass_)/(r12_sq_eps))*r12;//_uvec;
+#else
             long double &&r12_cubed_mag = (r12*r12*r12).magnitude();
             b1.acc += ((G*b2.mass_)/(r12_cubed_mag))*r12;
             b2.acc -= ((G*b1.mass_)/(r12_cubed_mag))*r12;
@@ -1767,15 +1771,32 @@ namespace gtd {
         sys_t &add_system(system<M, R, T, progress, merging, coll, mF, fF, bin> &&other, bool chk_overlap = true) {
             return this->add_bodies(std::move(other.bods), chk_overlap);
         }
+        bod_t &back() {
+            if (!this->bods.empty())
+                return this->bods.back();
+            throw std::logic_error{"gtd::system<>::back cannot be called on an empty gtd::system object.\n"};
+        }
         const bod_t &back() const {
             if (!this->bods.empty())
                 return this->bods.back();
             throw std::logic_error{"gtd::system<>::back cannot be called on an empty gtd::system object.\n"};
         }
+        bod_t &front() {
+            if (!this->bods.empty())
+                return this->bods.front();
+            throw std::logic_error{"gtd::system<>::front cannot be called on an empty gtd::system object.\n"};
+        }
         const bod_t &front() const {
             if (!this->bods.empty())
                 return this->bods.front();
             throw std::logic_error{"gtd::system<>::front cannot be called on an empty gtd::system object.\n"};
+        }
+        bod_t &get_body(uint64_t id) {
+            for (auto &b : *this) // this is where it would be nice to be using a set!!
+                if (b.id == id)
+                    return b;
+            throw std::invalid_argument("The id passed does not correspond to any body present in this system "
+                                        "object.\n");
         }
         const bod_t &get_body(uint64_t id) const {
             for (const auto &b : *this) // this is where it would be nice to be using a set!!
@@ -3415,10 +3436,15 @@ namespace gtd {
 #endif
             delete [] G_vals;
         }
-        const bod_t &operator[](vec_size_t index) const {
-            if (index >= bods.size())
+        bod_t &operator[](vec_size_t index) {
+            if (index >= this->bods.size())
                 throw std::out_of_range("The requested body does not exist (index out of range).\n");
-            return bods[index];
+            return this->bods[index];
+        }
+        const bod_t &operator[](vec_size_t index) const {
+            if (index >= this->bods.size())
+                throw std::out_of_range("The requested body does not exist (index out of range).\n");
+            return this->bods[index];
         }
         // implicitly-declared copy assignment operator is deleted, so must define my own:
         sys_t &operator=(const sys_t &other) {

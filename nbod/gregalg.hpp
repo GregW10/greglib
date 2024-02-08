@@ -1,5 +1,5 @@
-#ifndef GREGALG_H
-#define GREGALG_H
+#ifndef GREGALG_HPP
+#define GREGALG_HPP
 
 /* header file for important constants, concept definitions, algorithms (hence the name) and miscellaneous content */
 
@@ -26,7 +26,7 @@
 #undef _PI_
 #endif
 
-// value obtained from memory (yes that's the nerd I am):
+// value obtained from my memory (yes that's the nerd I am):
 #define _PI_ 3.14159265358979323846264338327950288419716939937510582097494459230l
 
 // value obtained from https://apod.nasa.gov/htmltest/gifcity/sqrt2.1mil (NASA):
@@ -35,9 +35,14 @@
 // I am aware the above two values are way past the max. precision of a long double, but having them to that many d.p.
 // makes me feel better
 
+#define MILLION 1'000'000.0l
 #define BILLION 1'000'000'000.0l
+#define TRILLION 1'000'000'000'000.0l
+#define QUADRILLION 1'000'000'000'000'000.0l
+#define QUINTILLION 1'000'000'000'000'000'000.0l
+#define SEXTILLION 1'000'000'000'000'000'000'000.0l
 
-#define MEAN_AVG(a, b) (((a) + (b))/2)
+#define MEAN_AVG(a, b) (((a) + (b))/2) // want to divide by 2.0l, but causes issues further down - must sort out
 
 #define SPHERE_VOLUME(rad) ((4.0l/3.0l)*_PI_*(rad)*(rad)*(rad))
 

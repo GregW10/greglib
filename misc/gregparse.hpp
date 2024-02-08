@@ -67,8 +67,8 @@ namespace gtd {
         }
     };
     class parser {
-        int argc;
-        const char *const *argv;
+        int argc; // mark for removal?
+        const char *const *argv; // mark for removal? Maybe use to return pointer to arg, rather than reallocated arg
         std::list<std::string> cmdl{};
     public:
         enum dup_pol {
@@ -194,9 +194,8 @@ namespace gtd {
                 throw std::invalid_argument{"Error: a flag MUST begin with a hyphen.\n"};
             bool dub = false;
             if (flag[1] == '-') {
-                if (flen == 2) {
+                if (flen == 2)
                     throw std::invalid_argument{"Error: a double-hyphen flag must have at least 3 characters.\n"};
-                }
                 dub = true;
             } else {
                 if (flen > 2)
@@ -235,7 +234,7 @@ namespace gtd {
                 std::string::size_type pos;
                 if (duplication_policy == THROW) {
                     while (it != eit) {
-                        if (it->operator[](0) == '-') {
+                        if (it->operator[](0) == '-' && it->operator[](1) != '-') {
                             if (it->length() == 2 && it->operator[](1) == flag[1]) {
                                 if (have)
                                     throw duplicate_error{};
@@ -257,7 +256,7 @@ namespace gtd {
                 }
                 else {
                     while (it != eit) {
-                        if (it->operator[](0) == '-') {
+                        if (it->operator[](0) == '-' && it->operator[](1) != '-') {
                             if (it->length() == 2 && it->operator[](1) == flag[1]) {
                                 it = this->cmdl.erase(it);
                                 have = true;
@@ -340,7 +339,7 @@ namespace gtd {
             return nullptr;
         }
         bool empty() const noexcept {
-            return this->argc;
+            return this->cmdl.empty();
         }
         auto begin() noexcept {
             return this->cmdl.begin();

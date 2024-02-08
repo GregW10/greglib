@@ -447,6 +447,12 @@ namespace gtd {
         const R &rad() const noexcept { \
             return radius; \
         } \
+        vector3D<T> &pos() noexcept { \
+            return curr_pos; \
+        } \
+        vector3D<T> &vel() noexcept { \
+            return curr_vel; \
+        } \
         const vector3D<T> &pos() const noexcept { \
             return curr_pos; \
         } \
