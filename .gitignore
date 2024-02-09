@@ -1,0 +1,8 @@
+cmake-build-debug/
+
+*.tsr
+*.sh
+
+CMakeLists.txt
+main
+test

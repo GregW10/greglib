@@ -174,6 +174,8 @@ namespace gtd {
         using vec_size_t = typename std::vector<bod_t>::size_type;
         using sys_t = system<M, R, T, prog, mergeOverlappingBodies, collisions, memFreq, fileFreq, binaryFile>;
         using mom_t = decltype(M{}*T{});
+        using ke_t = decltype(std::declval<M>()*std::declval<T>()*std::declval<T>());
+        using pe_t = decltype((std::declval<long double>()*std::declval<M>()*std::declval<M>())/std::declval<T>());
         using cube_t = bh_cube<M, R, T, memFreq>;
         using tree_t = bh_tree<M, R, T, memFreq>;
         std::vector<bod_t> bods; // not using set, map or list as need fast random access to bodies
@@ -1512,7 +1514,13 @@ namespace gtd {
             T yvel{};
             T zvel{};
         } nsys_chunk;
-        system() : G{G_SI} {this->parse_units_format("M1:1,D1:1,T1:1"); if constexpr (collisions) this->set_set();}
+        system() : G{G_SI} {
+            this->parse_units_format("M1:1,D1:1,T1:1");
+#ifdef GREGSYS_MERGERS
+            if constexpr (collisions)
+                this->set_set();
+#endif
+        }
         explicit system(const char *nsys_path, bool alloc_chunks = true, bool check_nan_inf = true,
                         bool allow_overlapping_bodies = true) {
             if (nsys_path == nullptr)
@@ -1613,13 +1621,37 @@ namespace gtd {
                 this->set_set();
 #endif
         }
+        system(const sys_t &other) : bods{other.bods.begin(), other.bods.end()}, dt{other.dt}, half_dt{dt/2},
+        iterations{other.iterations}, G{other.G} {
+            check_overlap();
+            // check_coll();
+            copy(this->G_vals, other.G_vals, 6*sizeof(uint64_t));
+            if constexpr (memFreq)
+                clear_bodies();
+#ifdef GREGSYS_MERGERS
+            if constexpr (collisions)
+                this->set_set();
+#endif
+        }
+        system(sys_t &&other) : bods{std::move(other.bods)}, dt{other.dt}, half_dt{dt/2}, iterations{other.iterations},
+        G{other.G} {
+            check_overlap();
+            // check_coll();
+            copy(this->G_vals, other.G_vals, 6*sizeof(uint64_t));
+            if constexpr (memFreq)
+                clear_bodies();
+#ifdef GREGSYS_MERGERS
+            if constexpr (collisions)
+                this->set_set();
+#endif
+        }
         /* copy constructors are made to only copy the variables seen below: it does not make sense for a new system
          * object (even when copy-constructed) to be "evolved" if it has not gone through the evolution itself */
         template <bool prg, bool mrg, int coll, uint64_t mF, uint64_t fF, bool bF>
         // so a system can be constructed from another without same checks
         system(const system<M, R, T, prg, mrg, coll, mF, fF, bF> &other,
-               bool allow_overlapping_bodies = true) :
-               bods{other.bods.begin(), other.bods.end()}, dt{other.dt}, iterations{other.iterations}, G{other.G} {
+               bool allow_overlapping_bodies = true) : bods{other.bods.begin(), other.bods.end()}, dt{other.dt},
+               half_dt{dt/2}, iterations{other.iterations}, G{other.G} {
             if (!allow_overlapping_bodies)
                 check_overlap();
             // check_coll();
@@ -1633,7 +1665,7 @@ namespace gtd {
         }
         template <bool prg, bool mrg, int coll, uint64_t fF, bool bF>
         system(system<M, R, T, prg, mrg, coll, memFreq, fF, bF> &&other, bool allow_overlapping_bodies = true) :
-               bods{std::move(other.bods)}, dt{other.dt}, iterations{other.iterations}, G{other.G} {
+               bods{std::move(other.bods)}, dt{other.dt}, half_dt{dt/2}, iterations{other.iterations}, G{other.G} {
             if (!allow_overlapping_bodies)
                 check_overlap();
             // check_coll();
@@ -1647,7 +1679,7 @@ namespace gtd {
         }
         template <bool prg, bool mrg, int coll, uint64_t mF, uint64_t fF, bool bF>
         system(system<M, R, T, prg, mrg, coll, mF, fF, bF> &&other, bool allow_overlapping_bodies = true) :
-               dt{other.dt}, iterations{other.iterations}, G{other.G} {
+               dt{other.dt}, half_dt{dt/2}, iterations{other.iterations}, G{other.G} {
             std::for_each(other.bods.begin(), other.bods.end(),
                           [this](body<M, R, T, mF> &b){bods.emplace_back(std::move(b));});
             if (!allow_overlapping_bodies)
@@ -1670,21 +1702,24 @@ namespace gtd {
         long double G_val() const noexcept {
             return this->G;
         }
-        bool set_iterations(uint64_t number) noexcept {
+        uint64_t iters() const noexcept {
+            return this->iterations;
+        }
+        uint64_t iters(uint64_t number) noexcept {
             if (!number) // cannot have zero iterations
-                return false;
-            iterations = number;
-            return true;
+                return this->iterations;
+            this->iterations = number;
+            return number;
         }
-        bool set_timestep(const long double &delta_t) noexcept {
+        long double timestep() const noexcept {
+            return this->dt;
+        }
+        long double timestep(const long double &delta_t) noexcept {
             if (delta_t <= 0)
-                return false;
-            dt = delta_t;
-            half_dt = dt/2;
-            return true;
-        }
-        bool set_timestep(const long double &&delta_t) noexcept {
-            return set_timestep(delta_t);
+                return this->dt;
+            this->dt = delta_t;
+            this->half_dt = dt/2;
+            return delta_t;
         }
         void set_G_units(const char *units_format) {
             this->parse_units_format(units_format);
@@ -1695,19 +1730,25 @@ namespace gtd {
             return nsys_file_size(this->bods.size());
         }
 #ifdef GREGSYS_SOFTENING
-        bool set_softening(long double _epsilon) noexcept {
-            if (_epsilon < sqrtl(std::numeric_limits<long double>::min()))
-                return false;
+        long double softening() const noexcept {
+            return eps;
+        }
+        long double softening(long double _epsilon) noexcept {
+            if (_epsilon < sqrtl(std::numeric_limits<long double>::min())) // to be improved
+                return eps;
             eps = _epsilon;
             eps_sq = _epsilon*_epsilon; // perhaps check this too
-            return true;
+            return _epsilon;
         }
 #endif
-        bool set_bh_opening_angle(long double _theta) {
+        long double bh_opening_angle(long double _theta) const noexcept {
+            return bh_theta;
+        }
+        long double bh_opening_angle(long double _theta) noexcept {
             if (_theta < 0 || _theta >= PI)
-                return false;
+                return bh_theta;
             bh_theta = _theta;
-            return true;
+            return _theta;
         }
 #ifdef GREGSYS_MERGERS
         bool set_min_tot_com_mom(const mom_t& total_momentum) requires (collisions != 0) {
@@ -1799,7 +1840,7 @@ namespace gtd {
                                         "object.\n");
         }
         const bod_t &get_body(uint64_t id) const {
-            for (const auto &b : *this) // this is where it would be nice to be using a set!!
+            for (const auto &b : *this)
                 if (b.id == id)
                     return b;
             throw std::invalid_argument("The id passed does not correspond to any body present in this system "
@@ -1813,6 +1854,68 @@ namespace gtd {
                     return true;
                 }
             return false;
+        }
+        ke_t kinetic_energy() const noexcept {
+            ke_t tot{};
+            for (const bod_t &b : this->bods)
+                tot += 0.5l*b.mass_*(b.curr_vel*b.curr_vel);
+            return tot;
+        }
+        pe_t potential_energy() const noexcept {
+            if (this->bods.empty())
+                return {};
+            pe_t tot{};
+            const bod_t *obod = this->bods.data();
+            const bod_t *ibod;
+            uint64_t o_counter = 0;
+            uint64_t i_counter;
+            this->num_bods = this->bods.size();
+            uint64_t num_m1 = this->num_bods - 1;
+            while (o_counter < num_m1) {
+                i_counter = ++o_counter;
+                ibod = obod + 1;
+                while (i_counter++ < this->num_bods)
+                    tot -= (obod->mass_*ibod->mass_)/(obod->curr_pos - ibod->curr_pos).magnitude();
+            }
+            return this->G*tot;
+        }
+        decltype(std::declval<ke_t>() + std::declval<pe_t>()) total_energy() const noexcept {
+            return this->kinetic_energy() + this->potential_energy();
+        }
+        vec_t com_pos() const {
+            if (this->bods.empty())
+                throw empty_system_error{};
+            vec_t _pos;
+            M mass{};
+            for (const bod_t &b : this->bods) {
+                _pos += b.mass_*b.curr_pos;
+                mass += b.mass_;
+            }
+            return _pos/mass;
+        }
+        vec_t com_vel() const {
+            if (this->bods.empty())
+                throw empty_system_error{};
+            vec_t _vel;
+            M mass{};
+            for (const bod_t &b : this->bods) {
+                _vel += b.mass_*b.curr_vel;
+                mass += b.mass_;
+            }
+            return _vel/mass;
+        }
+        std::pair<vec_t, vec_t> com_pos_vel() const { // convenience method, avoids double mass-summation
+            if (this->bods.empty())
+                throw empty_system_error{};
+            vec_t _pos;
+            vec_t _vel;
+            M mass{};
+            for (const bod_t &b : this->bods) {
+                _pos += b.mass_*b.curr_pos;
+                _vel += b.mass_*b.curr_vel;
+                mass += b.mass_;
+            }
+            return {_pos/mass, _vel/mass};
         }
         static inline sys_t random_comet(const vec_t &pos, // I will likely remove all these newlines eventually, but,
                                          const vec_t &vel, // for now, I like the clarity

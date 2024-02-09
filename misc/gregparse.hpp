@@ -183,102 +183,8 @@ namespace gtd {
             }
             return def_val;
         }
-        template <>
-        bool get_arg<bool>(const std::string &flag, const bool &def_val, dup_pol duplication_policy) {
-            size_t flen = flag.length();
-            if (!flen)
-                throw std::invalid_argument{"Error: an empty string cannot be passed as a flag.\n"};
-            if (flen == 1)
-                throw std::invalid_argument{"Error: a 1-character string cannot be passed as a flag.\n"};
-            if (flag[0] != '-')
-                throw std::invalid_argument{"Error: a flag MUST begin with a hyphen.\n"};
-            bool dub = false;
-            if (flag[1] == '-') {
-                if (flen == 2)
-                    throw std::invalid_argument{"Error: a double-hyphen flag must have at least 3 characters.\n"};
-                dub = true;
-            } else {
-                if (flen > 2)
-                    throw std::invalid_argument{"Error: single-hyphen flag can only be two characters long.\n"};
-            }
-            if (duplication_policy != THROW && duplication_policy != USE_FIRST && duplication_policy != USE_LAST)
-                throw std::invalid_argument{"Error: invalid duplication policy.\n"};
-            auto it = this->cmdl.begin();
-            auto eit = this->cmdl.end();
-            bool have = false;
-            if (dub) {
-                if (duplication_policy == THROW) {
-                    while (it != eit) {
-                        if (*it == flag) {
-                            if (have)
-                                throw duplicate_error{};
-                            it = this->cmdl.erase(it);
-                            have = true;
-                            continue;
-                        }
-                        ++it;
-                    }
-                }
-                else {
-                    while (it != eit) {
-                        if (*it == flag) {
-                            it = this->cmdl.erase(it);
-                            have = true;
-                            continue;
-                        }
-                        ++it;
-                    }
-                }
-            }
-            else {
-                std::string::size_type pos;
-                if (duplication_policy == THROW) {
-                    while (it != eit) {
-                        if (it->operator[](0) == '-' && it->operator[](1) != '-') {
-                            if (it->length() == 2 && it->operator[](1) == flag[1]) {
-                                if (have)
-                                    throw duplicate_error{};
-                                it = this->cmdl.erase(it);
-                                have = true;
-                                continue;
-                            }
-                            if ((pos = it->find(flag[1])) != std::string::npos) {
-                                if (have)
-                                    throw duplicate_error{};
-                                it->erase(pos, 1);
-                                have = true;
-                                if (it->find(flag[1]) != std::string::npos) // case in which there is still an
-                                    throw duplicate_error{}; // identical flag character remaining in the argument
-                            }
-                        }
-                        ++it;
-                    }
-                }
-                else {
-                    while (it != eit) {
-                        if (it->operator[](0) == '-' && it->operator[](1) != '-') {
-                            if (it->length() == 2 && it->operator[](1) == flag[1]) {
-                                it = this->cmdl.erase(it);
-                                have = true;
-                                continue;
-                            }
-                            if ((pos = it->find(flag[1])) != std::string::npos) {
-                                it->erase(pos, 1);
-                                have = true;
-                                while ((pos = it->find(flag[1])) != std::string::npos)
-                                    it->erase(pos, 1);
-                                if (it->length() == 1) {
-                                    it = this->cmdl.erase(it);
-                                    continue;
-                                }
-                            }
-                        }
-                        ++it;
-                    }
-                }
-            }
-            return have == !def_val;
-        }
+        // template <>
+        // bool get_arg<bool>(const std::string &flag, const bool &def_val, dup_pol duplication_policy);
         template <typename T>
         T get_arg(const std::string &flag, T (*func)(const char*), const T &def_val,
                   dup_pol duplication_policy = USE_FIRST) { // convenience method
@@ -357,5 +263,101 @@ namespace gtd {
             // std::for_each(this->flags.begin(), this->flags.end(), [](const char *flag){delete [] flag;});
         }
     };
+    template <>
+    bool parser::get_arg<bool>(const std::string &flag, const bool &def_val, dup_pol duplication_policy) {
+        size_t flen = flag.length();
+        if (!flen)
+            throw std::invalid_argument{"Error: an empty string cannot be passed as a flag.\n"};
+        if (flen == 1)
+            throw std::invalid_argument{"Error: a 1-character string cannot be passed as a flag.\n"};
+        if (flag[0] != '-')
+            throw std::invalid_argument{"Error: a flag MUST begin with a hyphen.\n"};
+        bool dub = false;
+        if (flag[1] == '-') {
+            if (flen == 2)
+                throw std::invalid_argument{"Error: a double-hyphen flag must have at least 3 characters.\n"};
+            dub = true;
+        } else {
+            if (flen > 2)
+                throw std::invalid_argument{"Error: single-hyphen flag can only be two characters long.\n"};
+        }
+        if (duplication_policy != THROW && duplication_policy != USE_FIRST && duplication_policy != USE_LAST)
+            throw std::invalid_argument{"Error: invalid duplication policy.\n"};
+        auto it = this->cmdl.begin();
+        auto eit = this->cmdl.end();
+        bool have = false;
+        if (dub) {
+            if (duplication_policy == THROW) {
+                while (it != eit) {
+                    if (*it == flag) {
+                        if (have)
+                            throw duplicate_error{};
+                        it = this->cmdl.erase(it);
+                        have = true;
+                        continue;
+                    }
+                    ++it;
+                }
+            }
+            else {
+                while (it != eit) {
+                    if (*it == flag) {
+                        it = this->cmdl.erase(it);
+                        have = true;
+                        continue;
+                    }
+                    ++it;
+                }
+            }
+        }
+        else {
+            std::string::size_type pos;
+            if (duplication_policy == THROW) {
+                while (it != eit) {
+                    if (it->operator[](0) == '-' && it->operator[](1) != '-') {
+                        if (it->length() == 2 && it->operator[](1) == flag[1]) {
+                            if (have)
+                                throw duplicate_error{};
+                            it = this->cmdl.erase(it);
+                            have = true;
+                            continue;
+                        }
+                        if ((pos = it->find(flag[1])) != std::string::npos) {
+                            if (have)
+                                throw duplicate_error{};
+                            it->erase(pos, 1);
+                            have = true;
+                            if (it->find(flag[1]) != std::string::npos) // case in which there is still an
+                                throw duplicate_error{}; // identical flag character remaining in the argument
+                        }
+                    }
+                    ++it;
+                }
+            }
+            else {
+                while (it != eit) {
+                    if (it->operator[](0) == '-' && it->operator[](1) != '-') {
+                        if (it->length() == 2 && it->operator[](1) == flag[1]) {
+                            it = this->cmdl.erase(it);
+                            have = true;
+                            continue;
+                        }
+                        if ((pos = it->find(flag[1])) != std::string::npos) {
+                            it->erase(pos, 1);
+                            have = true;
+                            while ((pos = it->find(flag[1])) != std::string::npos)
+                                it->erase(pos, 1);
+                            if (it->length() == 1) {
+                                it = this->cmdl.erase(it);
+                                continue;
+                            }
+                        }
+                    }
+                    ++it;
+                }
+            }
+        }
+        return have == !def_val;
+    }
 }
 #endif
