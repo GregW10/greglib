@@ -73,11 +73,11 @@ namespace gtd {
         }
         return ret_matrix;
     }
-    template <isNumWrapper U>
+    template <isNumWrapper>
     class vector;
-    template <isNumWrapper U>
+    template <isNumWrapper>
     class vector2D;
-    template <isNumWrapper U>
+    template <isNumWrapper>
     class vector3D;
     template <isNumWrapper T>
     class matrix {
