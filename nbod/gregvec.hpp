@@ -498,7 +498,7 @@ namespace gtd { // forward declarations, to be able to use the functions inside 
             return *this;
         }
         vector2D<T> operator~() requires requires (T val) {~val;} {
-            return vector2D<T>(~this->x, ~this->y);
+            return {~this->x, ~this->y};
         }
         vector2D<T> &operator=(const vector<T> &other) noexcept override {
             if (&other == this)
@@ -516,7 +516,7 @@ namespace gtd { // forward declarations, to be able to use the functions inside 
             this->y = other.y;
             return *this;
         }
-        vector2D<T> &operator=(const vector2D<T> &other) noexcept {
+        virtual vector2D<T> &operator=(const vector2D<T> &other) noexcept {
             this->x = other.x;
             this->y = other.y;
             return *this;
@@ -531,7 +531,7 @@ namespace gtd { // forward declarations, to be able to use the functions inside 
             } catch (const std::bad_cast &bc) {} // no action taken in case of std::bad_cast - vector obj. is unchanged
             return *this;
         }
-        vector2D<T> &operator=(vector2D<T> &&other) noexcept {
+        virtual vector2D<T> &operator=(vector2D<T> &&other) noexcept {
             this->x = std::move(other.x); // in case T is an object and not a primitive type
             this->y = std::move(other.y);
             return *this;

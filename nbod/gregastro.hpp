@@ -252,9 +252,9 @@ namespace gtd {
             return intersects(bod);
         }
         template <isNumWrapper M, isNumWrapper R, isNumWrapper T, uint64_t recFreq, container C, typename ... except>
-        requires (std::same_as<typename C::mapped_type, const body<M, R, T, recFreq>*> ||
+        requires ((std::same_as<typename C::mapped_type, const body<M, R, T, recFreq>*> ||
                   isConvertible<typename C::mapped_type, const body<M, R, T, recFreq>*>) &&
-                  std::same_as<typename C::key_type, const uint64_t>
+                  std::same_as<typename C::key_type, const uint64_t>)
         bool intersects(const C &bodies, except ...ids) {
             /* This method is similar to the other intersects() overloads, but it will set l to the distance between the
              * ray's origin and the closest body, and return true (if the ray intersects with at least one body). This
@@ -357,10 +357,6 @@ namespace gtd {
             vector3D<DirT>::z /= mag;
             return *this;
         }
-        ray_t &rotate(const long double &&angle_in_rad = _PI_, char about = 'z') override {
-            this->apply(matrix<long double>::get_3D_rotation_matrix(angle_in_rad, about));
-            return *this;
-        }
         ray_t &rotate(const long double &angle_in_rad = PI, char about = 'z') override {
             this->apply(matrix<long double>::get_3D_rotation_matrix(angle_in_rad, about));
             return *this;
@@ -371,20 +367,11 @@ namespace gtd {
             return *this;
         }
         // template <isNumWrapper U = T>
-        ray_t &rodrigues_rotate(const vector3D<DirT> &&about, long double angle = PI) noexcept override {
-            return this->rodrigues_rotate(about, angle);
-        }
-        // template <isNumWrapper U = T>
         ray_t &rotate_to(const vector3D<DirT> &new_direction) noexcept override {
-            if (this->is_zero()) {
+            if (this->is_zero())
                 return *this;
-            }
             return this->rodrigues_rotate(vec_ops::cross(*this, new_direction),
                                           vec_ops::angle_between(*this, new_direction));
-        }
-        // template <isNumWrapper U = T>
-        ray_t &rotate_to(const vector3D<DirT> &&new_direction) noexcept override {
-            return this->rotate_to(new_direction);
         }
         // template <isNumWrapper U = T>
         ray_t &rodrigues_rotate(const vector2D<DirT> &about, long double angle = PI) noexcept override {
@@ -392,27 +379,15 @@ namespace gtd {
             return *this;
         }
         // template <isNumWrapper U = T>
-        ray_t &rodrigues_rotate(const vector2D<DirT> &&about, long double angle = PI) noexcept override {
-            return this->rodrigues_rotate(about, angle);
-        }
-        // template <isNumWrapper U = T>
         ray_t &rotate_to(const vector2D<DirT> &new_direction) noexcept override {
-            if (this->is_zero()) {
+            if (this->is_zero())
                 return *this;
-            }
             return this->rodrigues_rotate(vec_ops::cross(*this, new_direction),
                                           vec_ops::angle_between(*this, new_direction));
-        }
-        // template <isNumWrapper U = T>
-        ray_t &rotate_to(const vector2D<DirT> &&new_direction) noexcept override {
-            return this->rotate_to(new_direction);
         }
         ray_t &apply(const matrix<DirT> &transform) override {
             vector3D<DirT>::apply(transform);
             return *this;
-        }
-        ray_t &apply(const matrix<DirT> &&transform) override {
-            return this->apply(transform);
         }
         ray_t &operator=(const vector<DirT> &other) noexcept override {
             vector3D<DirT>::operator=(other);
@@ -429,13 +404,13 @@ namespace gtd {
             vector3D<DirT>::operator=(other);
             this->calc();
             return *this;
-        }
+        } /*
         template <isConvertible<DirT> U>
         ray_t &operator=(const vector3D<U> &&other) noexcept {
             vector3D<DirT>::operator=(other); // no need to use std::move() here
             this->calc();
             return *this;
-        }
+        } */
         ray_t &operator=(vector<DirT> &&other) noexcept override {
             vector3D<DirT>::operator=(std::move(other));
             this->calc();
@@ -447,33 +422,33 @@ namespace gtd {
             return *this;
         }
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU>
-        friend std::ostream &operator<<(std::ostream &os, const ray<PosU, DirU, LenU> &r);
+        friend std::ostream &operator<<(std::ostream&, const ray<PosU, DirU, LenU>&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU>
-        friend std::ostream &operator<<(std::ostream &os, const ray<PosU, DirU, LenU> &&r);
+        friend std::ostream &operator<<(std::ostream&, const ray<PosU, DirU, LenU>&&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU,
                   isNumWrapper PosV, isNumWrapper DirV, isNumWrapper LenV>
-        friend bool operator==(const ray<PosU, DirU, LenU> &r1, const ray<PosV, DirV, LenV> &r2);
+        friend bool operator==(const ray<PosU, DirU, LenU>&, const ray<PosV, DirV, LenV>&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU,
                 isNumWrapper PosV, isNumWrapper DirV, isNumWrapper LenV>
-        friend bool operator==(const ray<PosU, DirU, LenU> &r1, const ray<PosV, DirV, LenV> &&r2);
+        friend bool operator==(const ray<PosU, DirU, LenU>&, const ray<PosV, DirV, LenV>&&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU,
                 isNumWrapper PosV, isNumWrapper DirV, isNumWrapper LenV>
-        friend bool operator==(const ray<PosU, DirU, LenU> &&r1, const ray<PosV, DirV, LenV> &r2);
+        friend bool operator==(const ray<PosU, DirU, LenU>&&, const ray<PosV, DirV, LenV>&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU,
                 isNumWrapper PosV, isNumWrapper DirV, isNumWrapper LenV>
-        friend bool operator==(const ray<PosU, DirU, LenU> &&r1, const ray<PosV, DirV, LenV> &&r2);
+        friend bool operator==(const ray<PosU, DirU, LenU>&&, const ray<PosV, DirV, LenV>&&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU,
                 isNumWrapper PosV, isNumWrapper DirV, isNumWrapper LenV>
-        friend bool operator!=(const ray<PosU, DirU, LenU> &r1, const ray<PosV, DirV, LenV> &r2);
+        friend bool operator!=(const ray<PosU, DirU, LenU>&, const ray<PosV, DirV, LenV>&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU,
                 isNumWrapper PosV, isNumWrapper DirV, isNumWrapper LenV>
-        friend bool operator!=(const ray<PosU, DirU, LenU> &r1, const ray<PosV, DirV, LenV> &&r2);
+        friend bool operator!=(const ray<PosU, DirU, LenU>&, const ray<PosV, DirV, LenV>&&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU,
                 isNumWrapper PosV, isNumWrapper DirV, isNumWrapper LenV>
-        friend bool operator!=(const ray<PosU, DirU, LenU> &&r1, const ray<PosV, DirV, LenV> &r2);
+        friend bool operator!=(const ray<PosU, DirU, LenU>&&, const ray<PosV, DirV, LenV>&);
         template <isNumWrapper PosU, isNumWrapper DirU, isNumWrapper LenU,
                 isNumWrapper PosV, isNumWrapper DirV, isNumWrapper LenV>
-        friend bool operator!=(const ray<PosU, DirU, LenU> &&r1, const ray<PosV, DirV, LenV> &&r2);
+        friend bool operator!=(const ray<PosU, DirU, LenU>&&, const ray<PosV, DirV, LenV>&&);
         template <isNumWrapper, isNumWrapper, isNumWrapper, isNumWrapper>
         friend class light_src;
         template <isNumWrapper, isNumWrapper, isNumWrapper, isNumWrapper, isNumWrapper, isNumWrapper, isNumWrapper,
