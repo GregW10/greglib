@@ -1950,6 +1950,31 @@ namespace gtd {
                 ++num;
         return num;
     }
+    bool startswith(const char *str, const char *with) {
+        if (!str || !with || !*with)
+            return false;
+        while (*with) {
+            if (!*str) // case for `str` being shorter than `with`
+                return false;
+            if (*str++ != *with++)
+                return false;
+        }
+        return true;
+    }
+    bool endswith(const char *str, const char *with) {
+        if (!str || !with || !*with)
+            return false;
+        size_t slen = strlen_c(str);
+        size_t wlen = strlen_c(with);
+        if (wlen > slen)
+            return false;
+        str += slen - wlen;
+        while (*with) {
+            if (*str++ != *with++)
+                return false;
+        }
+        return true;
+    }
     char **strsplit(const char *str, char delim = 32) {
         if (str == nullptr || !*str)
             return nullptr;

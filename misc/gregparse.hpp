@@ -69,30 +69,33 @@ namespace gtd {
     class parser {
         int argc; // mark for removal?
         const char *const *argv; // mark for removal? Maybe use to return pointer to arg, rather than reallocated arg
-        std::list<std::string> cmdl{};
+        std::list<std::pair<int, std::string>> cmdl{};
     public:
         enum dup_pol {
             THROW = 1,
             USE_FIRST = 2,
             USE_LAST = 4,
         };
-        parser(int _argc, const char *const *_argv, bool skip_first = true) {
+        parser(int _argc, const char *const *_argv, int to_skip = 1) {
             if (_argc < 0) {
                 err:
                 throw std::invalid_argument{"Error: number of arguments cannot be negative.\n"};
             }
-            if (skip_first) {
-                if (_argc == 0)
-                    goto err;
+            if (to_skip >= _argc)
+                throw std::invalid_argument{"Error: skip number too large - cannot skip all arguments.\n"};
+            while (to_skip --> 0) {
                 --_argc;
                 ++_argv;
             }
             this->argc = _argc;
             this->argv = _argv;
-            this->cmdl.assign(_argv, _argv + _argc);
+            _argc = 0; // use as counter
+            while (_argc < this->argc)
+                this->cmdl.emplace_back(_argc++, *_argv++);
+            // this->cmdl.assign(_argv, _argv + _argc);
         }
     private:
-        std::pair<std::list<std::string>::iterator, bool> process_flag(const std::string &flag,
+        std::pair<std::list<std::pair<int, std::string>>::iterator, bool> process_flag(const std::string &flag,
                                                                        dup_pol duplication_policy = USE_FIRST) {
             size_t flen = flag.length();
             if (!flen)
@@ -117,7 +120,7 @@ namespace gtd {
             decltype(it) arg_it;
             if (duplication_policy == THROW) {
                 while (it != eit) {
-                    if (*it == flag) {
+                    if (it->second == flag) {
                         if (have)
                             throw duplicate_error{};
                         it = this->cmdl.erase(it);
@@ -132,7 +135,7 @@ namespace gtd {
             }
             else if (duplication_policy == USE_FIRST) {
                 while (it != eit) {
-                    if (*it == flag) {
+                    if (it->second == flag) {
                         it = this->cmdl.erase(it);
                         if (it == eit)
                             throw missing_arg_error{};
@@ -147,7 +150,7 @@ namespace gtd {
             }
             else {
                 while (it != eit) {
-                    if (*it == flag) {
+                    if (it->second == flag) {
                         it = this->cmdl.erase(it);
                         if (it == eit)
                             throw missing_arg_error{};
@@ -169,17 +172,19 @@ namespace gtd {
             auto [arg_it, have] = process_flag(flag, duplication_policy);
             if constexpr (std::same_as<T, std::string>) {
                 if (have) {
-                    std::string retstr{std::move(*arg_it)};
+                    std::string retstr{std::move(arg_it->second)};
                     this->cmdl.erase(arg_it);
                     return retstr;
                 }
             }
-            if (have) {
-                T retval;
-                if (!(std::istringstream{*arg_it} >> retval)) // test for conversion error
-                    throw arg_conversion_error{*arg_it};
-                this->cmdl.erase(arg_it);
-                return retval;
+            else {
+                if (have) {
+                    T retval;
+                    if (!(std::istringstream{arg_it->second} >> retval)) // test for conversion error
+                        throw arg_conversion_error{arg_it->second};
+                    this->cmdl.erase(arg_it);
+                    return retval;
+                }
             }
             return def_val;
         }
@@ -189,23 +194,24 @@ namespace gtd {
         T get_arg(const std::string &flag, T (*func)(const char*), const T &def_val,
                   dup_pol duplication_policy = USE_FIRST) { // convenience method
             char *arg = get_arg(flag, duplication_policy);
-            T retval = arg ? func(arg) : def_val;
-            delete [] arg;
-            return retval;
+            return arg ? func(arg) : def_val;
         }
-        char *get_arg(const std::string &flag, dup_pol duplication_policy = USE_FIRST) {
+        const char *get_arg(const std::string &flag, dup_pol duplication_policy = USE_FIRST) {
             auto [arg_it, have] = process_flag(flag, duplication_policy);
-            char *ptr = strcpy_c(new char[arg_it->length() + 1], arg_it->data());
-            return have ? this->cmdl.erase(arg_it), ptr : nullptr;
+            if (!have)
+                return nullptr;
+            int index = arg_it->first;
+            this->cmdl.erase(arg_it);
+            return *(this->argv + index);
         }
-        char *get_arg(const std::regex &rgx, dup_pol duplication_policy = USE_FIRST) {
+        const char *get_arg(const std::regex &rgx, dup_pol duplication_policy = USE_FIRST) {
             bool have = false;
             if (duplication_policy == THROW) {
                 auto it = this->cmdl.begin();
                 auto eit = this->cmdl.end();
                 decltype(it) arg_it;
                 while (it != eit) {
-                    if (std::regex_match(*it, rgx)) {
+                    if (std::regex_match(it->second, rgx)) {
                         if (have)
                             throw duplicate_error{};
                         arg_it = it;
@@ -215,19 +221,24 @@ namespace gtd {
                     }
                     ++it;
                 }
-                char *ptr = strcpy_c(new char[arg_it->length() + 1], arg_it->data());
-                return have ? this->cmdl.erase(arg_it), ptr : nullptr;
+                if (have) {
+                    int index = arg_it->first;
+                    this->cmdl.erase(arg_it);
+                    return *(this->argv + index);
+                }
+                return nullptr;
             }
             if (duplication_policy == USE_FIRST) {
                 auto it = this->cmdl.begin();
                 auto eit = this->cmdl.end();
-                decltype(it) arg_it;
+                // decltype(it) arg_it;
                 while (it != eit) {
-                    if (std::regex_match(*it, rgx)) {
-                        char *ptr = strcpy_c(new char[it->length() + 1], it->data());
+                    if (std::regex_match(it->second, rgx)) {
+                        int index = it->first;
                         this->cmdl.erase(it);
-                        return ptr;
+                        return *(this->argv + index);
                     }
+                    ++it;
                 }
                 return nullptr;
             }
@@ -235,11 +246,12 @@ namespace gtd {
                 auto rit = this->cmdl.rbegin();
                 auto reit = this->cmdl.rend();
                 while (rit != reit) {
-                    if (std::regex_match(*rit, rgx)) {
-                        char *ptr = strcpy_c(new char[rit->length() + 1], rit->data());
+                    if (std::regex_match(rit->second, rgx)) {
+                        int index = rit->first;
                         this->cmdl.erase(--rit.base());
-                        return ptr;
+                        return *(this->argv + index);
                     }
+                    ++rit;
                 }
             }
             return nullptr;
@@ -289,7 +301,7 @@ namespace gtd {
         if (dub) {
             if (duplication_policy == THROW) {
                 while (it != eit) {
-                    if (*it == flag) {
+                    if (it->second == flag) {
                         if (have)
                             throw duplicate_error{};
                         it = this->cmdl.erase(it);
@@ -301,7 +313,7 @@ namespace gtd {
             }
             else {
                 while (it != eit) {
-                    if (*it == flag) {
+                    if (it->second == flag) {
                         it = this->cmdl.erase(it);
                         have = true;
                         continue;
@@ -314,20 +326,20 @@ namespace gtd {
             std::string::size_type pos;
             if (duplication_policy == THROW) {
                 while (it != eit) {
-                    if (it->operator[](0) == '-' && it->operator[](1) != '-') {
-                        if (it->length() == 2 && it->operator[](1) == flag[1]) {
+                    if (it->second.operator[](0) == '-' && it->second.operator[](1) != '-') {
+                        if (it->second.length() == 2 && it->second.operator[](1) == flag[1]) {
                             if (have)
                                 throw duplicate_error{};
                             it = this->cmdl.erase(it);
                             have = true;
                             continue;
                         }
-                        if ((pos = it->find(flag[1])) != std::string::npos) {
+                        if ((pos = it->second.find(flag[1])) != std::string::npos) {
                             if (have)
                                 throw duplicate_error{};
-                            it->erase(pos, 1);
+                            it->second.erase(pos, 1);
                             have = true;
-                            if (it->find(flag[1]) != std::string::npos) // case in which there is still an
+                            if (it->second.find(flag[1]) != std::string::npos) // case in which there is still an
                                 throw duplicate_error{}; // identical flag character remaining in the argument
                         }
                     }
@@ -336,18 +348,18 @@ namespace gtd {
             }
             else {
                 while (it != eit) {
-                    if (it->operator[](0) == '-' && it->operator[](1) != '-') {
-                        if (it->length() == 2 && it->operator[](1) == flag[1]) {
+                    if (it->second.operator[](0) == '-' && it->second.operator[](1) != '-') {
+                        if (it->second.length() == 2 && it->second.operator[](1) == flag[1]) {
                             it = this->cmdl.erase(it);
                             have = true;
                             continue;
                         }
-                        if ((pos = it->find(flag[1])) != std::string::npos) {
-                            it->erase(pos, 1);
+                        if ((pos = it->second.find(flag[1])) != std::string::npos) {
+                            it->second.erase(pos, 1);
                             have = true;
-                            while ((pos = it->find(flag[1])) != std::string::npos)
-                                it->erase(pos, 1);
-                            if (it->length() == 1) {
+                            while ((pos = it->second.find(flag[1])) != std::string::npos)
+                                it->second.erase(pos, 1);
+                            if (it->second.length() == 1) {
                                 it = this->cmdl.erase(it);
                                 continue;
                             }
