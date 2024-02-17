@@ -81,8 +81,9 @@ namespace gtd {
                 err:
                 throw std::invalid_argument{"Error: number of arguments cannot be negative.\n"};
             }
-            if (to_skip >= _argc)
-                throw std::invalid_argument{"Error: skip number too large - cannot skip all arguments.\n"};
+            if (to_skip > _argc)
+                throw std::invalid_argument{"Error: skip number too large - cannot skip more arguments than "
+                                            "those present.\n"};
             while (to_skip --> 0) {
                 --_argc;
                 ++_argv;
@@ -255,6 +256,9 @@ namespace gtd {
                 }
             }
             return nullptr;
+        }
+        std::list<std::pair<int, std::string>>::size_type remaining() const noexcept {
+            return this->cmdl.size();
         }
         bool empty() const noexcept {
             return this->cmdl.empty();
