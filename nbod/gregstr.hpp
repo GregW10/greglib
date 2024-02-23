@@ -1784,6 +1784,7 @@ namespace gtd {
     String operator+(const std::string &str, const String &string) {
         return String{string}.append_front(str);
     }
+#ifndef GREGPARSE_HPP
     size_t strlen_c(const char *str) {
         if (str == nullptr)
             return 0;
@@ -1791,6 +1792,7 @@ namespace gtd {
         while (*str++) ++length_c;
         return length_c;
     }
+#endif
     char *memset_c(char *str, char ch, size_t n_chars) {
         if (str == nullptr)
             return nullptr;
@@ -1798,6 +1800,7 @@ namespace gtd {
             *(str + i) = ch;
         return str;
     }
+#ifndef GREGPARSE_HPP
     char *strcpy_c(char *dest, const char *source) {
         if (dest == nullptr || source == nullptr)
             return nullptr;
@@ -1805,6 +1808,7 @@ namespace gtd {
         while ((*dest++ = *source++));
         return ptr;
     }
+#endif
     char *strcat_c(char *_dest, const char *_src) {
         if (_dest == nullptr || _src == nullptr)
             return nullptr;
@@ -1917,24 +1921,26 @@ namespace gtd {
         }
         return mul_by*retval;
     }
-    bool is_numeric(const char *str) {
-        if (str == nullptr || !*str)
+    bool is_integral(const char *str) {
+        if (!str)
             return false;
+        if (*str == '-')
+            if (!*++str)
+                return false;
         while (*str)
             if (!isdigit_c(*str++))
                 return false;
         return true;
     }
-    bool is_numeric(const std::string &str) {
+    bool is_integral(const std::string &str) {
         if (str.empty())
             return false;
-        for (const char &ch: str)
-            if (!isdigit_c(ch))
-                return false;
-        return true;
+        if (str[0] == '-' && str.size() > 1)
+            return std::all_of(++str.begin(), str.end(), isdigit_c);
+        return std::all_of(str.begin(), str.end(), isdigit_c);
     }
     bool contains(const char *str, char ch) {
-        if (str == nullptr || !*str || !ch)
+        if (!str)
             return false;
         while (*str)
             if (*str++ == ch)
