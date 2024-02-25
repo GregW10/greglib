@@ -1,5 +1,5 @@
-#ifndef GREGBASE_HPP
-#define GREGBASE_HPP
+#ifndef GREGTENS_HPP
+#define GREGTENS_HPP
 
 /* Some acronyms:
  *     LSD: Least significant dimension
@@ -14,81 +14,9 @@
 #include <sstream>
 #include <limits>
 #include <sys/stat.h>
+#include "greggen.hpp"
 
 namespace gml {
-    template <typename T>
-    concept Numeric = requires (T value) {
-        T{1};
-        // T{1.0l};
-        T{T{}};
-        {value + value} -> std::convertible_to<T>;
-        {1 + value} -> std::convertible_to<T>;
-        {value + 1} -> std::convertible_to<T>;
-        {1.0l + value} -> std::convertible_to<T>;
-        {value + 1.0l} -> std::convertible_to<T>;
-        {1 - value} -> std::convertible_to<T>;
-        {value - 1} -> std::convertible_to<T>;
-        {1.0l - value} -> std::convertible_to<T>;
-        {value - 1.0l} -> std::convertible_to<T>;
-        {value*value} -> std::convertible_to<T>;
-        {1*value} -> std::convertible_to<T>;
-        {value*1} -> std::convertible_to<T>;
-        {1.0l*value} -> std::convertible_to<T>;
-        {value*1.0l} -> std::convertible_to<T>;
-        {1/value} -> std::convertible_to<T>;
-        {value/1} -> std::convertible_to<T>;
-        {1.0l/value} -> std::convertible_to<T>;
-        {value/1.0l} -> std::convertible_to<T>;
-        {value += value} -> std::convertible_to<T>;
-        {value += 1} -> std::convertible_to<T>;
-        {value += 1.0l} -> std::convertible_to<T>;
-        {value -= 1} -> std::convertible_to<T>;
-        {value -= 1.0l} -> std::convertible_to<T>;
-        {value *= value} -> std::convertible_to<T>;
-        {value *= 1} -> std::convertible_to<T>;
-        {value *= 1.0l} -> std::convertible_to<T>;
-        {value /= 1} -> std::convertible_to<T>;
-        {value /= 1.0l} -> std::convertible_to<T>;
-    };
-    typedef unsigned long long ull_t;
-    bool memcopy(void *dst, const void *src, size_t elem_size, size_t num_elems) {
-        if (!dst || !src || !elem_size || !num_elems)
-            return false;
-        char *dest = static_cast<char*>(dst);
-        const char *source = static_cast<const char*>(src);
-        unsigned long long tot_bytes = elem_size*num_elems;
-        while (tot_bytes --> 0)
-            *dest++ = *source++;
-        return true;
-    }
-    bool memswap(void *obj1, void *obj2, size_t obj_size) {
-        if (!obj1 || !obj2 || !obj_size)
-            return false;
-        char *o1 = static_cast<char*>(obj1);
-        char *o2 = static_cast<char*>(obj2);
-        char temp;
-        while (obj_size --> 0) {
-            temp = *o1;
-            *o1++ = *o2;
-            *o2++ = temp;
-        }
-        return true;
-    }
-    template <typename T>
-    bool memswap(T *obj1, T *obj2) {
-        if (!obj1 || !obj2)
-            return false;
-        char *o1 = static_cast<char*>(obj1);
-        char *o2 = static_cast<char*>(obj2);
-        size_t size = sizeof(T);
-        char temp;
-        while (size --> 0) {
-            temp = *o1;
-            *o1++ = *o2;
-            *o2++ = temp;
-        }
-        return true;
-    }
     namespace exceptions {
         class tensor_error : public std::logic_error {
         public:
@@ -125,12 +53,17 @@ namespace gml {
         public:
             out_of_bounds_error() : invalid_indexing_error{"Error: index provided is out of bounds for "
                                                            "the given tensor.\n"} {}
-            out_of_bounds_error(const char *msg) : invalid_indexing_error{msg} {}
+            explicit out_of_bounds_error(const char *msg) : invalid_indexing_error{msg} {}
         };
         class invalid_tsr_format : public tensor_error {
         public:
             invalid_tsr_format() : tensor_error{"Error: the file format of the .tsr file is invalid.\n"} {}
-            invalid_tsr_format(const char *msg) : tensor_error{msg} {}
+            explicit invalid_tsr_format(const char *msg) : tensor_error{msg} {}
+        };
+        class invalid_mtsr_format : public invalid_tsr_format {
+        public:
+            invalid_mtsr_format() : invalid_tsr_format{"Error: the file format of the .mtsr file is invalid.\n"} {}
+            explicit invalid_mtsr_format(const char *msg) : invalid_tsr_format{msg} {}
         };
     }
     template <Numeric T>
@@ -212,20 +145,20 @@ namespace gml {
         }
     public:
         // shape() : _r{0}, _s{new ull_t[0]} {}
-        explicit tensor_shape(unsigned int rank) : _r{rank}, _s{new ull_t[rank]} {calc_sizes();}
+        explicit tensor_shape(unsigned int rank) : _r{rank}, _s{new ull_t[rank]} {calc_sizes();} // ERROR - NO SHAPE
         tensor_shape(unsigned int rank, ull_t *shape) : _r{rank}, _s{new ull_t[rank]} {
-            memcopy(_s, shape, sizeof(ull_t), rank);
+            gen::memcopy(_s, shape, sizeof(ull_t), rank);
             calc_sizes();
         }
         tensor_shape(const std::initializer_list<ull_t> &_shape) : _r{(unsigned int) _shape.size()},
                                                             _s{new ull_t[_r]} {
-            memcopy(_s, _shape.begin(), sizeof(ull_t), _r);
+            gen::memcopy(_s, _shape.begin(), sizeof(ull_t), _r);
             calc_sizes();
         }
         tensor_shape(const tensor_shape &other) : _r{other._r}, _s{new ull_t[_r]} {
-            memcopy(_s, other._s, sizeof(ull_t), _r);
+            gen::memcopy(_s, other._s, sizeof(ull_t), _r);
             if (_r)
-                memcopy(sizes, other.sizes, sizeof(ull_t), _r - 1);
+                gen::memcopy(sizes, other.sizes, sizeof(ull_t), _r - 1);
         }
         tensor_shape(tensor_shape &&other) noexcept : _r{other._r}, _s{other._s}, sizes{other.sizes} {
             other._s = nullptr;
@@ -269,9 +202,9 @@ namespace gml {
             if (&other == this)
                 return *this;
             if (other._r == this->_r) {
-                memcopy(_s, other._s, sizeof(ull_t), _r);
+                gen::memcopy(_s, other._s, sizeof(ull_t), _r);
                 if (_r)
-                    memcopy(sizes, other.sizes, sizeof(ull_t), _r - 1);
+                    gen::memcopy(sizes, other.sizes, sizeof(ull_t), _r - 1);
                 return *this;
             }
             this->_r = other._r;
@@ -279,8 +212,8 @@ namespace gml {
             this->_s = new ull_t[this->_r]{};
             if (this->_r) {
                 this->sizes = new ull_t[this->_r - 1];
-                memcopy(this->_s, other._s, sizeof(ull_t), this->_r);
-                memcopy(this->sizes, other.sizes, sizeof(ull_t), this->_r - 1);
+                gen::memcopy(this->_s, other._s, sizeof(ull_t), this->_r);
+                gen::memcopy(this->sizes, other.sizes, sizeof(ull_t), this->_r - 1);
             }
             else
                 this->sizes = nullptr;
@@ -354,9 +287,9 @@ namespace gml {
          *     - The `begin` and `end` operations are still well-defined for empty `tensor` objects.
          * */
     protected:
-        T *data{};
         tensor_shape _shape{};
         ull_t vol{};
+        T *data{}; // make sure initialisation order isn't causing any bugs
         static void print_array(std::ostream &os, std::streamsize width, const T *_data, unsigned int rank,
                                 const ull_t *curr_dim, const ull_t *_sizes, unsigned int max_rank,
                                 unsigned int spaces = 0) {
@@ -418,19 +351,9 @@ namespace gml {
             }
             return max_w;
         }
-        void load_tsr(const char *path) {
-            if (!path || !*path)
-                throw std::invalid_argument{"Error: null or empty path provided to .tsr file.\n"};
-            struct stat buff{};
-            if (stat(path, &buff) == -1)
-                throw std::ios_base::failure{"Error: could not access file.\n"};
-            if (buff.st_size < sizeof(unsigned int))
-                throw exceptions::invalid_tsr_format{"Invalid .tsr format: file size too small.\n"};
-            std::ifstream in{path, std::ios_base::in | std::ios_base::binary};
-            if (!in.good())
-                throw std::ios_base::failure{"Error: could not open file.\n"};
-            in.read((char *) &this->_shape._r, sizeof(unsigned int));
-            if (buff.st_size == sizeof(unsigned int)) { // case for empty tensor
+        void load_tsr(std::ifstream &in, size_t st_size) {
+            in.read((char *) &this->_shape._r, sizeof(uint32_t));
+            if (st_size == (4 + sizeof(uint32_t))) { // case for empty tensor
                 if (this->_shape._r)
                     throw exceptions::invalid_tsr_format{"Invalid .tsr format: file too small for non-empty tensor.\n"};
                 this->_shape._s = new ull_t[0];
@@ -438,46 +361,66 @@ namespace gml {
             }
             if (!this->_shape._r)
                 throw exceptions::invalid_tsr_format{"Invalid .tsr format: file too large for empty tensor.\n"};
-            ull_t fsize;
-            size_t arr_shape_size = this->_shape._r*sizeof(ull_t);
-            if (buff.st_size < (fsize = sizeof(unsigned int) + arr_shape_size + sizeof(ull_t)))
+            uint64_t fsize;
+            size_t arr_shape_size = this->_shape._r*sizeof(uint64_t);
+            if (st_size < (fsize = 4 + sizeof(uint32_t) + arr_shape_size + sizeof(uint64_t)))
                 throw exceptions::invalid_tsr_format{"Invalid .tsr format: file too small for rank read.\n"};
-            this->_shape._s = new ull_t[this->_shape._r];
-            this->_shape.sizes = new ull_t[this->_shape._r - 1];
+            this->_shape._s = new uint64_t[this->_shape._r];
+            this->_shape.sizes = new uint64_t[this->_shape._r - 1];
             in.read((char *) this->_shape._s, arr_shape_size);
-            ull_t T_size;
-            in.read((char *) &T_size, sizeof(ull_t));
+            uint64_t T_size;
+            in.read((char *) &T_size, sizeof(uint64_t));
             if (T_size != sizeof(T))
                 throw exceptions::invalid_tsr_format{"Invalid .tsr format: size of .tsr tensor data type does not "
-                                                     "match the sizeof the templated type T of this instance.\n"};
+                                                     "match the size of the templated type T of this instance.\n"};
             this->_shape.calc_sizes();
             this->vol = this->_shape.volume();
             size_t arr_size = sizeof(T)*this->vol;
             fsize += arr_size;
-            if (buff.st_size != fsize)
+            if (st_size != fsize)
                 throw exceptions::invalid_tsr_format{"Invalid .tsr format: invalid file size.\n"};
             this->data = new T[this->vol];
             in.read((char *) this->data, arr_size);
             in.close();
         }
+        void process_tsr(const char *path) {
+            if (!path || !*path)
+                throw std::invalid_argument{"Error: null or empty path provided to .tsr file.\n"};
+            struct stat buff{};
+            if (stat(path, &buff) == -1)
+                throw std::ios_base::failure{"Error: could not access file.\n"};
+            if (buff.st_size < (4 + sizeof(uint32_t)))
+                throw exceptions::invalid_tsr_format{"Invalid .tsr format: file size too small.\n"};
+            std::ifstream in{path, std::ios_base::in | std::ios_base::binary};
+            if (!in.good())
+                throw std::ios_base::failure{"Error: could not open file.\n"};
+            char header[4];
+            in.read(header, 4*sizeof(char));
+            if (header[0] || header[1] != 't' || header[2] != 's' || header[3] != 'r')
+                throw exceptions::invalid_tsr_format{"Invalid .tsr format: invalid header.\n"};
+            load_tsr(in, buff.st_size);
+        }
         explicit tensor(bool alloc) : data{}, vol{0}, _shape(alloc) {}
     public:
         static inline std::streamsize precision = 6; // default precision of output streams, as per the C++ standard
         tensor() : data{}, vol{0} {} // constructs an empty tensor
+        explicit tensor(const tensor_shape &_s):_shape{_s},vol{_s.volume()},data{new T[this->vol]}/* init. to zeros */{}
+        explicit tensor(tensor_shape &&_s) :
+        _shape{std::move(_s)}, vol{this->_shape.volume()}, data{new T[this->vol]} /* init. to zeros */ {}
         tensor(const std::vector<T> &_data, const tensor_shape &_s) : _shape{_s}, vol{_s.volume()} {
             if (this->vol != _data.size())
                 throw std::invalid_argument{"Error: the number of elements in the data and requested shape of tensor "
                                             "do not match.\n"};
             this->data = new T[vol];
-            memcopy(this->data, _data.data(), sizeof(T), this->vol);
+            gen::memcopy(this->data, _data.data(), sizeof(T), this->vol);
         }
         tensor(const T *_data, const tensor_shape &_s) : _shape{_s}, vol{_s.volume()} {
             this->data = new T[vol];
-            memcopy(this->data, _data, sizeof(T), this->vol);
+            gen::memcopy(this->data, _data, sizeof(T), this->vol);
         }
         tensor(const tensor<T> &other) : _shape{other.s}, vol{other.vol} {
             this->data = new T[vol];
-            memcopy(this->data, other.data, sizeof(T), other.vol);
+            gen::memcopy(this->data, other.data, sizeof(T), other.vol);
         }
         tensor(tensor<T> &&other) noexcept : data{other.data}, _shape{std::move(other.s)}, vol{other.vol} {
             other.data = nullptr;
@@ -485,7 +428,7 @@ namespace gml {
             other.vol = 0;
         }
         explicit tensor(const char *tsr_path) : _shape{false} {
-            load_tsr(tsr_path);
+            process_tsr(tsr_path);
         }
         template <typename ...types> requires (std::is_integral<types>::value && ...)
         T &at(types... indices) {
@@ -529,10 +472,11 @@ namespace gml {
             std::ofstream out{path, std::ios_base::out | std::ios_base::trunc};
             if (!out.good())
                 throw std::ios_base::failure{"Error: could not open file.\n"};
-            out.write((char *) &this->_shape._r, sizeof(unsigned int));
+            out.put(0); out.put('t'); out.put('s'); out.put('r');
+            out.write((char *) &this->_shape._r, sizeof(uint32_t));
             if (!this->data) { // this means the tensor is empty, so nothing more is written (just the rank of 0)
                 out.close();
-                return sizeof(unsigned int);
+                return 4 + sizeof(uint32_t); // == 8
             }
             out.write((char *) this->_shape._s, this->_shape._r*sizeof(ull_t));
             ull_t size = sizeof(T);
@@ -551,37 +495,6 @@ namespace gml {
         friend bool operator==(const tensor<U>&, const tensor<V>&);
         template <Numeric U, Numeric V>
         friend bool operator!=(const tensor<U>&, const tensor<V>&);
-    };
-    template <Numeric T>
-    class matrix : public tensor<T> {
-    public:
-        matrix() = default;
-        matrix(const std::initializer_list<std::initializer_list<T>> &li) : tensor<T>{false} {
-            typename std::initializer_list<T>::size_type li_size = li.size();
-            tensor<T>::_shape._r = 2; // rank will always be 2 for a matrix
-            tensor<T>::_shape._s = new ull_t[2]{}; // default initialised to zeros
-            tensor<T>::_shape.sizes = new ull_t[1]{}; // zero
-            if (!li_size) {
-                return;
-            }
-            const std::initializer_list<T> *ptr = li.begin();
-            typename std::initializer_list<T>::size_type sub_elems = ptr->size();
-            if (!sub_elems)
-                return;
-            tensor<T>::_shape._s[0] = li_size;
-            tensor<T>::_shape._s[1] = sub_elems;
-            tensor<T>::vol = li_size*sub_elems;
-            tensor<T>::data = new T[tensor<T>::vol];
-            T *dptr = tensor<T>::data;
-            while (--li_size > 0) {
-                if (ptr->size() != sub_elems) {
-                    delete [] tensor<T>::data; // is this safe?
-                    throw std::invalid_argument{"Error: sizes of nested initializer lists do not match.\n"};
-                }
-                memcopy(dptr++, ptr++->begin(), sizeof(T), sub_elems);
-            }
-            tensor<T>::_shape.sizes[0] = sub_elems;
-        }
     };
     template <Numeric T>
     std::ostream &operator<<(std::ostream &os, const tensor<T> &tens) {
