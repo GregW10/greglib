@@ -65,17 +65,41 @@ namespace gml {
             invalid_mtsr_format() : invalid_tsr_format{"Error: the file format of the .mtsr file is invalid.\n"} {}
             explicit invalid_mtsr_format(const char *msg) : invalid_tsr_format{msg} {}
         };
+        class dimension_mismatch_error : public tensor_error {
+        public:
+            dimension_mismatch_error() : tensor_error{"Error: there is a dimension mismatch between tensors.\n"} {}
+            explicit dimension_mismatch_error(const char *msg) : tensor_error{msg} {}
+        };
+        class empty_tensor_error : public tensor_error {
+        public:
+            empty_tensor_error() :tensor_error{"Error: the given operation cannot be performed on an empty tensor.\n"}{}
+            explicit empty_tensor_error(const char *msg) : tensor_error{msg} {}
+        };
     }
     template <Numeric T>
     class tensor;
     class tensor_shape {
+        /* Class whose instances describe the shape of a given tensor. I chose to not make it a nested class inside
+         * `tensor<T>`, as it should not and does not need to be templated.
+         * Notes:
+         *          - `_r` is the rank of the tensor. A 0D tensor is a scalar and has a rank of zero, with a volume of 1
+         *            (i.e. it has one element). An empty tensor, on the other hand, is given a rank of -1.
+         *          - `_s` is an array containing the dimensions of the tensor. It is always allocated for any non-empty
+         *            tensor. A shape describing a 0D tensor simply allocates an array of zero size. An empty tensor, on
+         *            the other hand, sets _s to be a nullptr.
+         *          - `sizes` is an array of size `_r - 1`, containing the sizes of previous layers. It is used only for
+         *            calculating the required offsets when indexing a tensor. If the tensor is 1D, then `sizes` is
+         *            still allocated, but with zero size. If the tensor is 0D or empty, then `sizes` is `nullptr`. */
     private:
-        unsigned int _r{}; // rank of the tensor
-        ull_t *_s{}; // its shape
-        ull_t *sizes = _r ? new ull_t[_r - 1] : nullptr; // holds the num. of elements in previous layers
+        int64_t _r{-1}; // rank of the tensor - is signed integral because has to be able to be -1 for empty tensor
+        uint64_t *_s{}; // its shape
+        uint64_t *sizes = _r > 0 ? new ull_t[_r - 1] : nullptr; // holds the num. of elements in previous layers
         virtual ull_t offset_at(const std::initializer_list<ull_t> &indices) const {
-            unsigned int num_indices = (unsigned int) indices.size();
-            if (num_indices != _r)
+            if (this->_r == -1) // case for an empty tensor
+                throw exceptions::empty_tensor_error{"Error: the offset for an empty tensor is undefined as no data is "
+                                                     "held.\n"};
+            int64_t num_indices = (int64_t) indices.size();
+            if (num_indices != _r) // will always throw if `*this` describes an empty tensor (since `_r` will be -1)
                 throw exceptions::indexing_dimension_error(_r, num_indices);
             if (!_r)
                 return 0; // in case of a 0D tensor (a scalar - pretty dumb to use a tensor for this)
@@ -93,13 +117,19 @@ namespace gml {
         }
         template <typename ...types> requires (std::is_integral<types>::value && ...)
         ull_t offset_at(types... indices) const {
+            if (this->_r == -1) // case for an empty tensor
+                throw exceptions::empty_tensor_error{"Error: the offset for an empty tensor is undefined as no data is "
+                                                     "held.\n"};
             if (sizeof...(indices) != this->_r)
                 throw exceptions::indexing_dimension_error(_r, sizeof...(indices));
-            if (((indices < 0) || ...))
-                throw std::invalid_argument{"Error: an index cannot be negative.\n"};
-            if (!this->_r)
-                return 0; // in case of a 0D tensor (a scalar - pretty dumb to use a tensor for this)
-            ull_t idx[] = {static_cast<ull_t>(indices)...};
+            if constexpr (sizeof...(indices)) {
+                if (((indices < 0) || ...))
+                    throw std::invalid_argument{"Error: an index cannot be negative.\n"};
+            } else  // thus, if `offset_at` is ever called with zero indices, the compiler will generate a version of
+                return 0; // this function which always returns zero
+            // if (!this->_r)
+            //     return 0; // in case of a 0D tensor (a scalar - pretty dumb to use a tensor for this)
+            uint64_t idx[] = {static_cast<uint64_t>(indices)...};
             // the algorithm I've commented out below allows me to remove the pre-calculated sizes (computed in
             // calc_sizes), but is more expensive if the dimensions of a tensor are not changed during many
             // repeated `offset_at` calls
@@ -114,10 +144,10 @@ namespace gml {
                 offset += prod*(*ptr--);
                 prod *= *dim--;
             } */
-            const ull_t *ptr = idx;
-            const ull_t *dim = this->_s;
-            ull_t offset = *(ptr + _r - 1);
-            ull_t *size = sizes;
+            const uint64_t *ptr = idx;
+            const uint64_t *dim = this->_s;
+            uint64_t offset = *(ptr + _r - 1);
+            uint64_t *size = sizes;
             unsigned int counter = 1;
             while (counter++ < _r) {
                 if (*ptr >= *dim++)
@@ -127,7 +157,7 @@ namespace gml {
             return offset;
         }
         void calc_sizes() noexcept {
-            if (!_r || _r == 1)
+            if (this->_r <= 1) // there are no previous layers if the tensor is 1D, 0D or empty
                 return;
             unsigned int counter = 1; // first dimension NOT required for index calculations
             ull_t *dim = _s + _r - 1; // points to LSD (least significant dimension)
@@ -138,82 +168,111 @@ namespace gml {
                 prod = *size--;
             }
         }
-        explicit tensor_shape(bool alloc = true) {
-            std::cout << "\n-----------\nDefault tensor_shape ctor being called.\n-------------" << std::endl;
-            if (alloc)
-                this->_s = new ull_t[0];
+        // explicit tensor_shape(bool alloc) {
+        //     if (alloc)
+        //         this->_s = new ull_t[0];
+        // }
+        tensor_shape(unsigned int rank, uint64_t *_shape, bool make_copy = true) : _r{rank} {
+            /* Private ctor for efficient construction of a tensor_shape object (used internally by other classes). */
+            /* This ctor is never called for creating a shape describing an empty tensor. */
+            if (make_copy) {
+                _s = new uint64_t[rank];
+                gen::memcopy(_s, _shape, sizeof(uint64_t), rank);
+            } else
+                _s = _shape;
+            this->calc_sizes();
         }
     public:
-        // shape() : _r{0}, _s{new ull_t[0]} {}
-        explicit tensor_shape(unsigned int rank) : _r{rank}, _s{new ull_t[rank]} {calc_sizes();} // ERROR - NO SHAPE
-        tensor_shape(unsigned int rank, ull_t *shape) : _r{rank}, _s{new ull_t[rank]} {
-            gen::memcopy(_s, shape, sizeof(ull_t), rank);
+        tensor_shape() = default; // only way to construct an empty tensor shape
+        explicit tensor_shape(uint32_t rank) : _r{rank}, _s{new uint64_t[rank]} {calc_sizes();}
+        tensor_shape(uint32_t rank, uint64_t *_shape) : _r{rank}, _s{new uint64_t[rank]} {
+            gen::memcopy(_s, _shape, sizeof(uint64_t), rank);
             calc_sizes();
         }
-        tensor_shape(const std::initializer_list<ull_t> &_shape) : _r{(unsigned int) _shape.size()},
-                                                            _s{new ull_t[_r]} {
-            gen::memcopy(_s, _shape.begin(), sizeof(ull_t), _r);
+        tensor_shape(const std::initializer_list<uint64_t> &_shape) : _r{(unsigned int) _shape.size()},
+                                                            _s{new uint64_t[_r]} {
+            gen::memcopy(_s, _shape.begin(), sizeof(uint64_t), _r);
             calc_sizes();
         }
-        tensor_shape(const tensor_shape &other) : _r{other._r}, _s{new ull_t[_r]} {
-            gen::memcopy(_s, other._s, sizeof(ull_t), _r);
+        tensor_shape(const tensor_shape &other) : _r{other._r} {
+            if (this->_r == -1) {
+                return;
+            }
+            this->_s = new uint64_t[_r];
+            gen::memcopy(_s, other._s, sizeof(uint64_t), _r);
             if (_r)
-                gen::memcopy(sizes, other.sizes, sizeof(ull_t), _r - 1);
+                gen::memcopy(sizes, other.sizes, sizeof(uint64_t), _r - 1);
         }
         tensor_shape(tensor_shape &&other) noexcept : _r{other._r}, _s{other._s}, sizes{other.sizes} {
+            other._r = -1; // the other shape is left as describing an empty tensor
             other._s = nullptr;
             other.sizes = nullptr;
         }
-        tensor_shape &make_zero() {
+        tensor_shape &make_empty() { // makes the shape describe an empty tensor (not 0D, actually properly empty)
             this->~tensor_shape();
-            this->_r = 0;
-            this->_s = new ull_t[0];
+            this->_r = -1;
+            this->_s = nullptr;
             this->sizes = nullptr;
             return *this;
         }
         tensor_shape &set(const std::initializer_list<ull_t> &new_shape) {
-            this->_r = new_shape.size();
+            /* It is impossible to use this method to set the shape as describing an empty tensor. The `make_empty`
+             * method should be used for that. */
+            this->_r = (int64_t) new_shape.size();
             this->~tensor_shape();
-            this->_s = new ull_t[0];
+            this->_s = new ull_t[this->_r];
             this->sizes = this->_r ? new ull_t[this->_r - 1] : nullptr;
             return *this;
         }
-        ull_t volume() const noexcept {
-            unsigned int counter = 0;
-            ull_t vol = 1;
-            ull_t *ptr = this->_s;
+        uint64_t volume() const noexcept {
+            if (this->_r == -1)
+                return 0;
+            int64_t counter = 0;
+            uint64_t vol = 1;
+            uint64_t *ptr = this->_s;
             while (counter++ < this->_r)
                 vol *= *ptr++;
-            return vol;
+            return vol; // a 0D tensor (a scalar) shape will always return 1, as the tensor contains a single element
         }
-        unsigned int rank() const noexcept {
-            return _r;
+        int64_t rank() const noexcept {
+            return _r; // returns -1 for an empty tensor shape
         }
         tensor_shape copy() const {
             return {*this};
         }
         const ull_t *begin() const noexcept {
-            return this->_s;
+            return this->_s; // is `nullptr` for empty tensor, and non-dereference-able for a 0D tensor, though not null
         }
         const ull_t *end() const noexcept {
+            if (this->_r <= 0)
+                return this->_s; // thus, if the tensor shape is empty or 0D, `begin == end`
             return this->_s + this->_r;
         }
         tensor_shape &operator=(const tensor_shape &other) {
             if (&other == this)
                 return *this;
             if (other._r == this->_r) {
-                gen::memcopy(_s, other._s, sizeof(ull_t), _r);
+                if (this->_r == -1) { // nothing to do or to copy if both shapes already describe an empty tensor
+                    return *this;
+                }
+                gen::memcopy(_s, other._s, sizeof(uint64_t), _r);
                 if (_r)
-                    gen::memcopy(sizes, other.sizes, sizeof(ull_t), _r - 1);
+                    gen::memcopy(sizes, other.sizes, sizeof(uint64_t), _r - 1);
                 return *this;
             }
             this->_r = other._r;
-            this->~tensor_shape();
-            this->_s = new ull_t[this->_r]{};
+            delete [] this->_s;
+            delete [] this->sizes;
+            if (other._r == -1) { // case for *this becoming a shape describing an empty tensor
+                this->_s = nullptr;
+                this->sizes = nullptr;
+                return *this;
+            }
+            this->_s = new uint64_t[this->_r]{}; // should I be default initialising if _r == 0 ?
             if (this->_r) {
-                this->sizes = new ull_t[this->_r - 1];
-                gen::memcopy(this->_s, other._s, sizeof(ull_t), this->_r);
-                gen::memcopy(this->sizes, other.sizes, sizeof(ull_t), this->_r - 1);
+                this->sizes = new uint64_t[this->_r - 1];
+                gen::memcopy(this->_s, other._s, sizeof(uint64_t), this->_r);
+                gen::memcopy(this->sizes, other.sizes, sizeof(uint64_t), this->_r - 1);
             }
             else
                 this->sizes = nullptr;
@@ -223,6 +282,7 @@ namespace gml {
             if (&other == this)
                 return *this;
             this->_r = other._r;
+            other._r = -1;
             this->~tensor_shape();
             this->_s = other._s;
             other._s = nullptr;
@@ -247,6 +307,8 @@ namespace gml {
         friend std::ostream &operator<<(std::ostream&, const tensor<U>&);
     };
     std::ostream &operator<<(std::ostream &out, const tensor_shape &_shape) {
+        if (_shape._r == -1)
+            return out << "(None)";
         if (!_shape._r)
             return out << "()";
         unsigned int counter = 0;
@@ -264,6 +326,8 @@ namespace gml {
     bool operator==(const tensor_shape &s1, const tensor_shape &s2) {
         if (s1._r != s2._r)
             return false;
+        if (s1._r == -1) // if the shapes describe an empty tensor, it is automatically known that they are equal
+            return true;
         unsigned int counter = s1._r;
         ull_t *p1 = s1._s;
         ull_t *p2 = s2._s;
@@ -281,23 +345,23 @@ namespace gml {
          * operations defined. */
         /* Notes:
          *     - There is a distinction between a rank/order 0 tensor and an empty tensor. A tensor of order 0 is,
-         *       essentially, a scalar, and, thus, has only 1 element. Its shape is empty, (). An empty tensor is a
-         *       special case in which no data is held at all. Its shape is also empty, but it is differentiated from a
-         *       tensor of order 0 by the `data` pointer being `nullptr`.
+         *       essentially, a scalar, and, thus, has only 1 element. Its shape is `()`. An empty tensor is a
+         *       special case in which no data is held at all. Its shape is `(None)`, and it is differentiated from a
+         *       tensor of order 0 by the `data` pointer being `nullptr` (and by fields in the `tensor_shape` object).
          *     - The `begin` and `end` operations are still well-defined for empty `tensor` objects.
          * */
     protected:
-        tensor_shape _shape{};
-        ull_t vol{};
+        tensor_shape _shape{}; // empty shape by default
+        uint64_t vol{};
         T *data{}; // make sure initialisation order isn't causing any bugs
-        static void print_array(std::ostream &os, std::streamsize width, const T *_data, unsigned int rank,
-                                const ull_t *curr_dim, const ull_t *_sizes, unsigned int max_rank,
+        static void print_array(std::ostream &os, std::streamsize width, const T *_data, int64_t rank,
+                                const uint64_t *curr_dim, const uint64_t *_sizes, unsigned int max_rank,
                                 unsigned int spaces = 0) {
             if (!curr_dim || !*curr_dim) {
                 os << "[]";
                 return;
             }
-            ull_t num_elems = *curr_dim;
+            uint64_t num_elems = *curr_dim;
             unsigned int counter = spaces;
             while (counter --> 0)
                 os << ' ';
@@ -311,9 +375,9 @@ namespace gml {
                     os << +(*_data++);
                 }
             } else {
-                unsigned int next_rank = rank - 1;
-                const ull_t *next_dim = curr_dim + 1;
-                const ull_t *next_size = next_rank == 1 ? nullptr : _sizes + 1; // for completeness
+                int64_t next_rank = rank - 1;
+                const uint64_t *next_dim = curr_dim + 1;
+                const uint64_t *next_size = next_rank == 1 ? nullptr : _sizes + 1; // for completeness
                 print_array(os, width, _data, next_rank, next_dim, next_size, max_rank, 0);
                 _data += *_sizes;
                 --num_elems;
@@ -325,7 +389,7 @@ namespace gml {
             }
             os << ']';
         }
-        static std::streamsize max_width(const T *_data, ull_t size) {
+        static std::streamsize max_width(const T *_data, uint64_t size) {
             std::ostringstream oss;
             std::streamsize max_w = 0;
             std::streamsize width;
@@ -352,18 +416,31 @@ namespace gml {
             return max_w;
         }
         void load_tsr(std::ifstream &in, size_t st_size) {
-            in.read((char *) &this->_shape._r, sizeof(uint32_t));
-            if (st_size == (4 + sizeof(uint32_t))) { // case for empty tensor
-                if (this->_shape._r)
-                    throw exceptions::invalid_tsr_format{"Invalid .tsr format: file too small for non-empty tensor.\n"};
-                this->_shape._s = new ull_t[0];
+            in.read((char *) &this->_shape._r, sizeof(int64_t));
+            if (this->_shape._r == -1) { // case for empty tensor
+                if (st_size != (4 + sizeof(int64_t)))
+                    throw exceptions::invalid_tsr_format{"Invalid .tsr format: invalid file size for empty tensor.\n"};
+                // this->_shape._s = nullptr;
                 return;
             }
-            if (!this->_shape._r)
-                throw exceptions::invalid_tsr_format{"Invalid .tsr format: file too large for empty tensor.\n"};
+            if (!this->_shape._r) {
+                if (st_size != 4 + sizeof(int64_t) + sizeof(uint64_t) + sizeof(T))
+                    throw exceptions::invalid_tsr_format{"Invalid .tsr format: invalid file size for empty tensor.\n"};
+                uint64_t T_size;
+                in.read((char *) &T_size, sizeof(uint64_t));
+                if (T_size != sizeof(T))
+                    throw exceptions::invalid_tsr_format{"Invalid .tsr format: sizeof(T) mismatch.\n"};
+                this->vol = 1;
+                this->data = new T[1];
+                in.read((char *) this->data, sizeof(T));
+                in.close();
+                this->_shape._s = new uint64_t[0];
+                // this->_shape.sizes = nullptr;
+                return;
+            }
             uint64_t fsize;
             size_t arr_shape_size = this->_shape._r*sizeof(uint64_t);
-            if (st_size < (fsize = 4 + sizeof(uint32_t) + arr_shape_size + sizeof(uint64_t)))
+            if (st_size < (fsize = 4 + sizeof(int64_t) + arr_shape_size + sizeof(uint64_t)))
                 throw exceptions::invalid_tsr_format{"Invalid .tsr format: file too small for rank read.\n"};
             this->_shape._s = new uint64_t[this->_shape._r];
             this->_shape.sizes = new uint64_t[this->_shape._r - 1];
@@ -400,14 +477,27 @@ namespace gml {
                 throw exceptions::invalid_tsr_format{"Invalid .tsr format: invalid header.\n"};
             load_tsr(in, buff.st_size);
         }
-        explicit tensor(bool alloc) : data{}, vol{0}, _shape(alloc) {}
+        // ctor ONLY to be used within other methods that will manually initialise the shape object:
+        // explicit tensor(bool alloc) : data{}, vol{0}, _shape(alloc) {}
+        tensor(T *_data, int64_t rank, uint64_t *_s, bool copy_shape = true) :
+        _shape{rank, _s, copy_shape}, vol{_shape.volume()}, data{_data} {}
+        tensor(T *_data, int64_t rank, uint64_t *_s, uint64_t _volume, bool copy_shape = true) :
+        _shape{rank, _s, copy_shape}, vol{_volume}, data{_data} {}
     public:
         static inline std::streamsize precision = 6; // default precision of output streams, as per the C++ standard
-        tensor() : data{}, vol{0} {} // constructs an empty tensor
-        explicit tensor(const tensor_shape &_s):_shape{_s},vol{_s.volume()},data{new T[this->vol]}/* init. to zeros */{}
+        tensor() = default; // constructs an empty tensor
+        explicit tensor(const T &val) : _shape(0), vol{1}, data{new T[1]{val}} {} // constructs 0D tensor (one element)
+        explicit tensor(const tensor_shape &_s) :
+        _shape{_s}, vol{_s.volume()}, data{this->vol ? new T[this->vol]{} : nullptr}/* init. to zeros if non-empty */ {}
         explicit tensor(tensor_shape &&_s) :
-        _shape{std::move(_s)}, vol{this->_shape.volume()}, data{new T[this->vol]} /* init. to zeros */ {}
+        _shape{std::move(_s)}, vol{this->_shape.volume()}, data{this->vol ? new T[this->vol]{} : nullptr} {}
         tensor(const std::vector<T> &_data, const tensor_shape &_s) : _shape{_s}, vol{_s.volume()} {
+            if (!this->vol) {
+                if (!_data.empty())
+                    throw exceptions::empty_tensor_error{"Error: an empty tensor cannot be initialised with a non-empty"
+                                                         " std::vector.\n"};
+                return;
+            }
             if (this->vol != _data.size())
                 throw std::invalid_argument{"Error: the number of elements in the data and requested shape of tensor "
                                             "do not match.\n"};
@@ -415,41 +505,56 @@ namespace gml {
             gen::memcopy(this->data, _data.data(), sizeof(T), this->vol);
         }
         tensor(const T *_data, const tensor_shape &_s) : _shape{_s}, vol{_s.volume()} {
+            if (!this->vol)
+                return;
+            if (!_data)
+                throw std::invalid_argument{"Error: `nullptr` supplied as pointer to data, but non-empty shape was "
+                                            "passed.\n"};
             this->data = new T[vol];
             gen::memcopy(this->data, _data, sizeof(T), this->vol);
         }
-        tensor(const tensor<T> &other) : _shape{other.s}, vol{other.vol} {
+        tensor(const tensor<T> &other) : _shape{other._shape}, vol{other.vol} {
+            if (!this->vol)
+                return; // leave `data` as `nullptr` for empty tensor
             this->data = new T[vol];
             gen::memcopy(this->data, other.data, sizeof(T), other.vol);
         }
-        tensor(tensor<T> &&other) noexcept : data{other.data}, _shape{std::move(other.s)}, vol{other.vol} {
-            other.data = nullptr;
-            other.s.make_zero();
+        tensor(tensor<T> &&other) noexcept : _shape{std::move(other._shape)}, vol{other.vol}, data{other.data} {
+            other._shape.make_empty();
             other.vol = 0;
+            other.data = nullptr; // the other tensor object is left empty (not 0D, but properly empty)
         }
-        explicit tensor(const char *tsr_path) : _shape{false} {
+        explicit tensor(const char *tsr_path) /* : _shape{false} */ {
             process_tsr(tsr_path);
         }
         template <typename ...types> requires (std::is_integral<types>::value && ...)
-        T &at(types... indices) {
+        T &at(types... indices) { // no checking performed to not affect efficiency, so could produce SIGSEGV
             return *(this->data + this->_shape.offset_at(indices...));
         }
         template <typename ...types> requires (std::is_integral<types>::value && ...)
         const T &at(types... indices) const {
-            return *(this->data + this->s.offset_at(indices...));
+            return *(this->data + this->_shape.offset_at(indices...));
         }
         bool empty() const noexcept {
-            return !this->data;
+            /* The pending question is whether I should define an N-D tensor (where N > 0) which has one or more
+             * dimensions equal to zero as an empty tensor or not. If so, it would be a different breed of empty tensor
+             * from the ones in which `this->_shape._r == -1`, as they would have a positive rank, but hold no elements
+             * because they have been completely squished down through one or more of their dimensions. */
+            return !this->vol; // or `this->_shape._r == -1` ?
         }
-        ull_t volume() const noexcept {
-            if (this->data)
-                return this->s.volume();
-            return 0;
+        uint64_t volume() const noexcept {
+            // if (this->data)
+            //     return this->vol;//this->s.volume();
+            // return 0;
+            return this->vol;
         }
         tensor<T> copy() const {
             return {*this};
         }
         tensor &reshape(const tensor_shape &new_shape) {
+            if (this->vol != new_shape.volume())
+                throw exceptions::dimension_mismatch_error{"Error: cannot reshape to requested shape as this would "
+                                                           "require modifying the number of elements.\n"};
             this->_shape = new_shape;
             return *this;
         }
@@ -473,21 +578,68 @@ namespace gml {
             if (!out.good())
                 throw std::ios_base::failure{"Error: could not open file.\n"};
             out.put(0); out.put('t'); out.put('s'); out.put('r');
-            out.write((char *) &this->_shape._r, sizeof(uint32_t));
-            if (!this->data) { // this means the tensor is empty, so nothing more is written (just the rank of 0)
+            out.write((char *) &this->_shape._r, sizeof(int64_t));
+            if (this->_shape._r == -1) { // means the tensor is empty, so nothing more is written (just the rank of -1)
                 out.close();
-                return 4 + sizeof(uint32_t); // == 8
+                return 4*sizeof(char) + sizeof(int64_t); // == 12
             }
-            out.write((char *) this->_shape._s, this->_shape._r*sizeof(ull_t));
-            ull_t size = sizeof(T);
-            out.write((char *) &size, sizeof(ull_t));
-            out.write((char *) this->data, sizeof(T)*this->vol);
+            // if (!this->_shape._r) {
+            //     // not needed, as this case is naturally addressed below
+            // }
+            out.write((char *) this->_shape._s, this->_shape._r*sizeof(uint64_t)); // no write if 0D
+            uint64_t size = sizeof(T);
+            out.write((char *) &size, sizeof(uint64_t));
+            out.write((char *) this->data, sizeof(T)*this->vol); // writes the single element if 0D
             std::ofstream::pos_type bytes = out.tellp();
             out.close();
             return bytes;
         }
         ~tensor() {
             delete [] data;
+        }
+        template <Numeric U, Numeric V>
+        friend tensor<addComT<U, V>> operator+(const tensor<U> &t1, const tensor<V> &t2) {
+            if (t1._shape != t2._shape)
+                throw exceptions::dimension_mismatch_error{"Error: addition between tensors can only be performed "
+                                                           "between tensors of equal shapes.\n"};
+            if (t1._shape._r == -1) // case for addition between two empty tensors
+                return {}; // empty tensor returned
+            addComT<U, V> _ndata = new addComT<U, V>[t1.vol];
+            uint64_t counter = t1.vol;
+            addComT<U, V> *nptr = _ndata;
+            U *d1 = t1.data;
+            V *d2 = t2.data;
+            while (counter --> 0)
+                *nptr++ = *d1++ + *d2++;
+            return {_ndata, t1._shape._r, t1._shape._s, t1.vol, true}; // let ctor make a copy of the shape array
+        }
+        template <Numeric U, Numeric V>
+        friend tensor<subComT<U, V>> operator-(const tensor<U> &t1, const tensor<V> &t2) {
+            if (t1._shape != t2._shape)
+                throw exceptions::dimension_mismatch_error{"Error: subtraction between tensors can only be performed "
+                                                           "between tensors of equal shapes.\n"};
+            if (t1._shape._r == -1)
+                return {};
+            subComT<U, V> _ndata = new subComT<U, V>[t1.vol];
+            uint64_t counter = t1.vol;
+            subComT<U, V> *nptr = _ndata;
+            U *d1 = t1.data;
+            V *d2 = t2.data;
+            while (counter --> 0)
+                *nptr++ = *d1++ - *d2++;
+            return {_ndata, t1._shape._r, t1._shape._s, t1.vol, true};
+        }
+        template <Numeric U, Numeric V>
+        friend tensor<mulComT<U, V>> operator*(const U &scalar, const tensor<V> &tens) {
+            if (tens._shape._r == -1)
+                return {};
+            mulComT<U, V> _ndata = new mulComT<U, V>[tens.vol];
+            uint64_t counter = tens.vol;
+            mulComT<U, V> *nptr = _ndata;
+            V *vptr = tens.data;
+            while (counter --> 0)
+                *nptr++ = scalar*(*vptr++);
+            return {_ndata, tens._shape._r, tens._shape._s, tens.vol, true};
         }
         template <Numeric U>
         friend std::ostream &operator<<(std::ostream&, const tensor<U>&);
@@ -498,6 +650,10 @@ namespace gml {
     };
     template <Numeric T>
     std::ostream &operator<<(std::ostream &os, const tensor<T> &tens) {
+        if (tens._shape._r == -1)
+            return os << "[]";
+        if (!tens._shape._r)
+            return os << '[' << *tens.data << ']';
         std::streamsize prev_width = os.width();
         std::streamsize max_w;
         if constexpr (std::floating_point<T>) {

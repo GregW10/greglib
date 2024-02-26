@@ -3,6 +3,10 @@
 
 #include <type_traits>
 
+#define MILLION 1'000'000.0l
+#define BILLION 1'000'000'000.0l
+#define TRILLION 1'000'000'000'000.0l
+
 namespace gml {
     template <typename T>
     concept Numeric = requires (T value) {
@@ -38,7 +42,13 @@ namespace gml {
         {value /= 1} -> std::convertible_to<T>;
         {value /= 1.0l} -> std::convertible_to<T>;
     };
-    typedef unsigned long long ull_t;
+    template <typename U, typename V>
+    using addComT = decltype(std::declval<U>() + std::declval<V>());
+    template <typename U, typename V>
+    using subComT = decltype(std::declval<U>() - std::declval<V>());
+    template <typename U, typename V>
+    using mulComT = decltype(std::declval<U>()*std::declval<V>());
+    typedef uint64_t ull_t;
     namespace gen {
         bool memcopy(void *dst, const void *src, size_t elem_size, size_t num_elems) {
             if (!dst || !src || !elem_size || !num_elems)
@@ -67,9 +77,45 @@ namespace gml {
         bool memswap(T *obj1, T *obj2) {
             if (!obj1 || !obj2)
                 return false;
-            char *o1 = static_cast<char*>(obj1);
-            char *o2 = static_cast<char*>(obj2);
             size_t size = sizeof(T);
+            if (!(size % sizeof(uint64_t))) {
+                uint64_t *o1 = (uint64_t*) (obj1);
+                uint64_t *o2 = (uint64_t*) (obj2);
+                size /= sizeof(uint64_t);
+                uint64_t temp;
+                while (size --> 0) {
+                    temp = *o1;
+                    *o1++ = *o2;
+                    *o2++ = temp;
+                }
+                return true;
+            }
+            if (!(size % sizeof(uint32_t))) {
+                uint32_t *o1 = (uint32_t*) (obj1);
+                uint32_t *o2 = (uint32_t*) (obj2);
+                size /= sizeof(uint32_t);
+                uint32_t temp;
+                while (size --> 0) {
+                    temp = *o1;
+                    *o1++ = *o2;
+                    *o2++ = temp;
+                }
+                return true;
+            }
+            if (!(size % sizeof(uint16_t))) {
+                uint16_t *o1 = (uint16_t*) (obj1);
+                uint16_t *o2 = (uint16_t*) (obj2);
+                size /= sizeof(uint16_t);
+                uint16_t temp;
+                while (size --> 0) {
+                    temp = *o1;
+                    *o1++ = *o2;
+                    *o2++ = temp;
+                }
+                return true;
+            }
+            char *o1 = (char*) (obj1);
+            char *o2 = (char*) (obj2);
             char temp;
             while (size --> 0) {
                 temp = *o1;
@@ -84,6 +130,15 @@ namespace gml {
             uint64_t count = 0;
             while (*str++) ++count;
             return count;
+        }
+        char *strcpy_c(char *dst, const char *src) {
+            if (!dst || !src)
+                return nullptr;
+            char *org = dst;
+            while (*src)
+                *dst++ = *src++;
+            *dst = 0;
+            return org;
         }
         bool endswith(const char *str, const char *with) {
             if (!str || !with || !*str)
