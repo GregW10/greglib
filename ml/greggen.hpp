@@ -48,6 +48,8 @@ namespace gml {
     using subComT = decltype(std::declval<U>() - std::declval<V>());
     template <typename U, typename V>
     using mulComT = decltype(std::declval<U>()*std::declval<V>());
+    template <typename U, typename V>
+    using divComT = decltype(std::declval<U>()/std::declval<V>());
     typedef uint64_t ull_t;
     namespace gen {
         bool memcopy(void *dst, const void *src, size_t elem_size, size_t num_elems) {

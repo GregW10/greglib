@@ -96,7 +96,9 @@ namespace gml {
         matrix(T *_data, unsigned int rank, uint64_t *_s, uint64_t _volume, bool copy_shape = true) :
         tensor<T>{_data, rank, _s, _volume, copy_shape} {}
     public:
-        matrix() = default;
+        matrix() : tensor<T>{tensor_shape{0, 0}} {
+            // CHECK THIS
+        }
         explicit matrix(const char *tsr_path) /* : tensor<T>{false} */ {
             delegate_mtsr(tsr_path);
         }
@@ -110,28 +112,50 @@ namespace gml {
             tensor<T>::_shape._s = new ull_t[2]{}; // default initialised to zeros
             tensor<T>::_shape.sizes = new ull_t[1]{}; // zero
             if (!li_size) { // emtpy initializer list, so no action taken
-                return; // does any other action have to be taken? check this
+                this->data = new T[tensor<T>::vol]; // zero elements
+                return; // matrix is left as a 2D empty tensor
             }
             const std::initializer_list<T> *ptr = li.begin();
             typename std::initializer_list<T>::size_type sub_elems = ptr->size();
-            if (!sub_elems) // list of empty initializer lists
-                return;
+            if (!sub_elems) { // list of empty initializer lists
+                this->data = new T[tensor<T>::vol]; // zero elements
+                return; // again, left as a 2D empty tensor
+            }
             tensor<T>::_shape._s[0] = li_size;
             tensor<T>::_shape._s[1] = sub_elems;
             tensor<T>::vol = li_size*sub_elems;
             tensor<T>::data = new T[tensor<T>::vol];
             T *dptr = tensor<T>::data;
-            // std::cout << "li_size: " << li_size << "\nsub_elems: " << sub_elems << "\nvol: " << this->vol << '\n';
             while (li_size --> 0) {
                 if (ptr->size() != sub_elems) {
                     delete [] tensor<T>::data; // is this safe? - because of stack unwinding in exception throwing
                     throw std::invalid_argument{"Error: sizes of nested initializer lists do not match.\n"};
                 }
-                // memcopy(dptr++, ptr++->begin(), sizeof(T), sub_elems);
                 gen::memcopy(dptr, ptr++->begin(), sizeof(T), sub_elems);
                 dptr += sub_elems;
             }
             tensor<T>::_shape.sizes[0] = sub_elems;
+        }
+        matrix &reshape(const tensor_shape &new_shape) override {
+            if (this->vol != new_shape.volume())
+                throw exceptions::dimension_mismatch_error{"Error: cannot reshape to requested shape as this would "
+                                                           "require modifying the number of elements.\n"};
+            if (new_shape._r != 2)
+                throw exceptions::dimension_mismatch_error{"Error: a matrix must have a rank of 2.\n"};
+            this->_shape = new_shape;
+            return *this;
+        }
+        T &at(const std::initializer_list<uint64_t> &indices) override {
+            if (indices.size() != 2)
+                throw exceptions::indexing_dimension_error{"Error: exactly two indices must be given to index a "
+                                                           "matrix.\n"};
+            return *(tensor<T>::data + (*indices.begin())*(*(tensor<T>::_shape._s + 1)) + *(indices.end() - 1));
+        }
+        const T &at(const std::initializer_list<uint64_t> &indices) const override {
+            if (indices.size() != 2)
+                throw exceptions::indexing_dimension_error{"Error: exactly two indices must be given to index a "
+                                                           "matrix.\n"};
+            return *(tensor<T>::data + (*indices.begin())*(*(tensor<T>::_shape._s + 1)) + *(indices.end() - 1));
         }
         std::ofstream::pos_type to_mtsr(const char *path) {
             if (!path || !*path)
@@ -149,10 +173,10 @@ namespace gml {
             out.close();
             return pos;
         }
-        T &operator()(uint64_t _i, uint64_t _j) noexcept { // doesn't throw, so must be careful when called
+        virtual T &operator()(uint64_t _i, uint64_t _j) noexcept { // doesn't throw, so must be careful when called
             return *(tensor<T>::data + _i*(*(tensor<T>::_shape._s + 1)) + _j);
         }
-        const T &operator()(uint64_t _i, uint64_t _j) const noexcept {
+        virtual const T &operator()(uint64_t _i, uint64_t _j) const noexcept {
             return *(tensor<T>::data + _i*(*(tensor<T>::_shape._s + 1)) + _j);
         }
         template <Numeric U, Numeric V>

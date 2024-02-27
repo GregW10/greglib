@@ -99,7 +99,7 @@ namespace gml {
                 throw exceptions::empty_tensor_error{"Error: the offset for an empty tensor is undefined as no data is "
                                                      "held.\n"};
             int64_t num_indices = (int64_t) indices.size();
-            if (num_indices != _r) // will always throw if `*this` describes an empty tensor (since `_r` will be -1)
+            if (num_indices != _r)
                 throw exceptions::indexing_dimension_error(_r, num_indices);
             if (!_r)
                 return 0; // in case of a 0D tensor (a scalar - pretty dumb to use a tensor for this)
@@ -215,13 +215,13 @@ namespace gml {
             this->sizes = nullptr;
             return *this;
         }
-        tensor_shape &set(const std::initializer_list<ull_t> &new_shape) {
+        tensor_shape &set(const std::initializer_list<uint64_t> &new_shape) {
             /* It is impossible to use this method to set the shape as describing an empty tensor. The `make_empty`
              * method should be used for that. */
             this->_r = (int64_t) new_shape.size();
             this->~tensor_shape();
-            this->_s = new ull_t[this->_r];
-            this->sizes = this->_r ? new ull_t[this->_r - 1] : nullptr;
+            this->_s = new uint64_t[this->_r];
+            this->sizes = this->_r ? new uint64_t[this->_r - 1] : nullptr;
             return *this;
         }
         uint64_t volume() const noexcept {
@@ -349,6 +349,12 @@ namespace gml {
          *       special case in which no data is held at all. Its shape is `(None)`, and it is differentiated from a
          *       tensor of order 0 by the `data` pointer being `nullptr` (and by fields in the `tensor_shape` object).
          *     - The `begin` and `end` operations are still well-defined for empty `tensor` objects.
+         *     - There is another breed of empty tensor objects: these are tensor objects that have a positive rank, but
+         *       that have at least one dimension that is zero. These are also "empty", as they cannot store any data
+         *       (since even one dimension being zero leads to a total tensor volume of zero), but are not treated in
+         *       exactly the same way as "truly" empty tensor objects with a rank of -1. Their rank is preserved as
+         *       whatever it was stated to be, and the `data` pointer is allocated, just with a size of zero (so it is
+         *       not `nullptr`, as in the case of a "truly" empty tensor with a rank of -1).
          * */
     protected:
         tensor_shape _shape{}; // empty shape by default
@@ -423,9 +429,9 @@ namespace gml {
                 // this->_shape._s = nullptr;
                 return;
             }
-            if (!this->_shape._r) {
+            if (!this->_shape._r) { // case for 0D (scalar) tensor
                 if (st_size != 4 + sizeof(int64_t) + sizeof(uint64_t) + sizeof(T))
-                    throw exceptions::invalid_tsr_format{"Invalid .tsr format: invalid file size for empty tensor.\n"};
+                    throw exceptions::invalid_tsr_format{"Invalid .tsr format: invalid file size for a 0D tensor.\n"};
                 uint64_t T_size;
                 in.read((char *) &T_size, sizeof(uint64_t));
                 if (T_size != sizeof(T))
@@ -487,36 +493,44 @@ namespace gml {
         static inline std::streamsize precision = 6; // default precision of output streams, as per the C++ standard
         tensor() = default; // constructs an empty tensor
         explicit tensor(const T &val) : _shape(0), vol{1}, data{new T[1]{val}} {} // constructs 0D tensor (one element)
-        explicit tensor(const tensor_shape &_s) :
-        _shape{_s}, vol{_s.volume()}, data{this->vol ? new T[this->vol]{} : nullptr}/* init. to zeros if non-empty */ {}
-        explicit tensor(tensor_shape &&_s) :
-        _shape{std::move(_s)}, vol{this->_shape.volume()}, data{this->vol ? new T[this->vol]{} : nullptr} {}
+        explicit tensor(const tensor_shape &_s) : _shape{_s}, vol{_s.volume()},
+        data{this->_shape._r >= 0 ? new T[this->vol]{} : nullptr} /* init. to zeros if non-empty */ {}
+        explicit tensor(tensor_shape &&_s) : _shape{std::move(_s)}, vol{this->_shape.volume()},
+        data{this->_shape._r >= 0 ? new T[this->vol]{} : nullptr} {}
         tensor(const std::vector<T> &_data, const tensor_shape &_s) : _shape{_s}, vol{_s.volume()} {
             if (!this->vol) {
                 if (!_data.empty())
                     throw exceptions::empty_tensor_error{"Error: an empty tensor cannot be initialised with a non-empty"
                                                          " std::vector.\n"};
-                return;
+                if (this->_shape._r >= 1) // case for an empty positive-rank tensor: `data` is allocated with zero size
+                    this->data = new T[this->vol];
+                return; // `data` only left as `nullptr` if `_r == -1`
             }
             if (this->vol != _data.size())
                 throw std::invalid_argument{"Error: the number of elements in the data and requested shape of tensor "
                                             "do not match.\n"};
-            this->data = new T[vol];
+            this->data = new T[this->vol];
             gen::memcopy(this->data, _data.data(), sizeof(T), this->vol);
         }
         tensor(const T *_data, const tensor_shape &_s) : _shape{_s}, vol{_s.volume()} {
-            if (!this->vol)
+            if (!this->vol) {
+                if (this->_shape._r >= 1) // same reasoning as above ctor
+                    this->data = new T[this->vol];
                 return;
+            }
             if (!_data)
                 throw std::invalid_argument{"Error: `nullptr` supplied as pointer to data, but non-empty shape was "
                                             "passed.\n"};
-            this->data = new T[vol];
+            this->data = new T[this->vol];
             gen::memcopy(this->data, _data, sizeof(T), this->vol);
         }
         tensor(const tensor<T> &other) : _shape{other._shape}, vol{other.vol} {
-            if (!this->vol)
-                return; // leave `data` as `nullptr` for empty tensor
-            this->data = new T[vol];
+            if (!this->vol) {
+                if (this->_shape._r >= 1) // same reasoning again
+                    this->data = new T[this->vol];
+                return;
+            }
+            this->data = new T[this->vol];
             gen::memcopy(this->data, other.data, sizeof(T), other.vol);
         }
         tensor(tensor<T> &&other) noexcept : _shape{std::move(other._shape)}, vol{other.vol}, data{other.data} {
@@ -535,11 +549,20 @@ namespace gml {
         const T &at(types... indices) const {
             return *(this->data + this->_shape.offset_at(indices...));
         }
+        virtual T &at(const std::initializer_list<uint64_t> &indices) { // non-templated version, can be overriden
+            return *(this->data + this->_shape.offset_at(indices));
+        }
+        virtual const T &at(const std::initializer_list<uint64_t> &indices) const {
+            return *(this->data + this->_shape.offset_at(indices));
+        }
         bool empty() const noexcept {
             /* The pending question is whether I should define an N-D tensor (where N > 0) which has one or more
              * dimensions equal to zero as an empty tensor or not. If so, it would be a different breed of empty tensor
              * from the ones in which `this->_shape._r == -1`, as they would have a positive rank, but hold no elements
              * because they have been completely squished down through one or more of their dimensions. */
+            /* Decision taken: N-D tensors (where N > 0) with one or more zero-dimensions ARE classified as empty,
+             * though they are treated slightly differently to empty tensors with `_r == -1`. Their `data` pointer is
+             * allocated a size of zero, and their rank is preserved. Thus, their shape includes one or more zeros. */
             return !this->vol; // or `this->_shape._r == -1` ?
         }
         uint64_t volume() const noexcept {
@@ -548,10 +571,13 @@ namespace gml {
             // return 0;
             return this->vol;
         }
+        int64_t rank() const noexcept {
+            return this->_shape._r;
+        }
         tensor<T> copy() const {
             return {*this};
         }
-        tensor &reshape(const tensor_shape &new_shape) {
+        virtual tensor &reshape(const tensor_shape &new_shape) {
             if (this->vol != new_shape.volume())
                 throw exceptions::dimension_mismatch_error{"Error: cannot reshape to requested shape as this would "
                                                            "require modifying the number of elements.\n"};
@@ -560,6 +586,22 @@ namespace gml {
         }
         const tensor_shape &shape() const noexcept {
             return this->_shape;
+        }
+        tensor &for_each(void (*func)(const T&)) {
+            uint64_t counter = this->vol;
+            T *ptr = this->data;
+            while (counter --> 0)
+                func(*ptr++);
+            return *this;
+        }
+        tensor &for_each(void (*func)(T)) {
+            uint64_t counter = this->vol;
+            T *ptr = this->data;
+            while (counter --> 0) {
+                *ptr = func(*ptr);
+                ++ptr;
+            }
+            return *this;
         }
         T *begin() noexcept {
             /* If `this->data` is `nullptr` (empty tensor), this operation is still defined. */
@@ -639,6 +681,18 @@ namespace gml {
             V *vptr = tens.data;
             while (counter --> 0)
                 *nptr++ = scalar*(*vptr++);
+            return {_ndata, tens._shape._r, tens._shape._s, tens.vol, true};
+        }
+        template <Numeric U, Numeric V>
+        friend tensor<divComT<U, V>> operator/(const tensor<U> &tens, const V &scalar) {
+            if (tens._shape._r == -1)
+                return {};
+            divComT<U, V> _ndata = new divComT<U, V>[tens.vol];
+            uint64_t counter = tens.vol;
+            divComT<U, V> *nptr = _ndata;
+            U *vptr = tens.data;
+            while (counter --> 0)
+                *nptr++ = (*vptr++)/scalar;
             return {_ndata, tens._shape._r, tens._shape._s, tens.vol, true};
         }
         template <Numeric U>

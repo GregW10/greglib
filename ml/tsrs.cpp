@@ -73,12 +73,12 @@ int main(int argc, char **argv) {
     if (rank == 2) {
         uint64_t fsize;
         printf("\033[38;5;93m.tsr file size \033[38;5;226m=\033[1m\033[38;5;10m %" PRIu64
-        "\033[0m \033[38;5;14mbytes\n", (fsize = 8*(2 + rank) + gml::gen::product(dims.begin(), dims.end())*T_s));
+        "\033[0m \033[38;5;14mbytes\n", (fsize = 4*(5 + 2*rank) + gml::gen::product(dims.begin(), dims.end())*T_s));
         printf("\033[38;5;93m.mtsr file size \033[38;5;226m=\033[1m\033[38;5;10m %" PRIu64
-        "\033[0m \033[38;5;14mbytes\n", fsize - 4);
+        "\033[0m \033[38;5;14mbytes\n", fsize - 8);
         return 0;
     }
     printf("\033[38;5;93m.tsr file size \033[38;5;226m=\033[1m\033[38;5;10m %" PRIu64 "\033[0m \033[38;5;14mbytes\n",
-            8*(2 + rank) + gml::gen::product(dims.begin(), dims.end())*T_s);
+            4*(5 + 2*rank) + gml::gen::product(dims.begin(), dims.end())*T_s);
     return 0;
 }
