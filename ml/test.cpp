@@ -2,72 +2,36 @@
 #include <concepts>
 #include <sstream>
 #include <iomanip>
-
-namespace gml {
-    template <typename T>
-    concept Numeric = requires (T value) {
-        T{1};
-    };
-    class crap {
-        int g{};
-    public:
-        crap() = default;
-        crap(int a) : g{a} {}
-        template <Numeric T>
-        friend class tensor;
-    };
-    template <Numeric T>
-    class tensor {
-    protected:
-        crap c{};
-    public:
-        class shape {
-        public:
-            shape() = default;
-            friend std::ostream &operator<<(std::ostream &out, const shape &s);
-            template <Numeric U, Numeric V>
-            friend bool operator==(const typename tensor<U>::shape &s1, const typename tensor<V>::shape &s2) {
-                return true;
-            }
-        };
-        tensor() {
-            std::cout << "tensor ctor" << std::endl;
-        }
-        void other() {
-            std::cout << this->c.g << std::endl;
-        }
-    };
-    template <Numeric T>
-    class matrix : public tensor<T> {
-    public:
-        void something() {
-            std::cout << this->c.g << std::endl;
-        }
-    };
-    template <Numeric U>
-    std::ostream &operator<<(std::ostream &out, const typename tensor<U>::shape &s) {
-        return out << "PRINTING AT LAST!!!\n" << std::endl;
-    }
-}
+#include "gregvct.hpp"
 
 int main() {
-    std::ostringstream oss;
-    std::cout << "Beginning: " << oss.tellp() << std::endl;
-    oss << "Hello!";
-    std::cout << "Now: " << oss.tellp() << std::endl;
-    std::cout << "Current contents: " << oss.str() << std::endl;
-    oss.seekp(0);
-    std::cout << "After seeking: " << oss.tellp() << std::endl;
-    std::cout << "Current contents: " << oss.str() << std::endl;
-    oss << "Shh";
-    std::cout << "Now: " << oss.tellp() << std::endl;
-    std::cout << "Current contents: " << oss.str() << std::endl;
-    std::cout << "Default width: " << std::cout.width() << ", default precision: " << std::cout.precision() << std::endl;
-    std::cout << std::setw(3) << std::setprecision(5);
-    std::cout << 98 << ", " << 987 << ", " << 9876 << std::endl;
-    std::cout << 987654321 << std::endl;
-    std::cout << 1234546.123456l << std::endl;
-    gml::matrix<int> m;
-    m.other();
+    gml::vector<long double> vec = {1, 2, 3, 4, 5, 6};
+    std::cout << "vec:\n" << vec << std::endl;
+    gml::vector<long double, false> vec2 = {1, 2, 3, 4, 5, 6};
+    std::cout << "vec2:\n" << vec2 << "\n---------\n" << std::endl;
+    gml::matrix<long double> mat = {{5, 3, 2, 5, 3, 3, 1, 7, 3},
+                                    {9, 8, 7, 6, 5, 4, 8, 2, 5},
+                                    {1, 1, 5, 2, 8, 2, 1, 7, 3},
+                                    {8, 5, 2, 3, 1, 2, 8, 9, 4},
+                                    {1, 2, 3, 4, 5, 6, 1, 7, 0},
+                                    {5, 8, 2, 4, 1, 9, 6, 0, 1}};
+    // std::cout << mat << "\nx\n" << vec << "\n=\n" << vec.apply(mat) << "\n--------\n" << std::endl;
+    std::cout << vec2 << "\nx\n" << mat << "\n=\n" << vec2.apply(mat) << "\n--------\n" << std::endl;
+    std::cout << vec2 << "\nx\n" << mat << "\n=\n" << mat*vec2 << "\n--------\n" << std::endl;
+    std::cout << vec << "\nx\n" << vec2 << "\n=\n" << vec*vec2 << "\n-----------\n" << std::endl;
+    gml::matrix<long double> m;
+    m = std::move(mat);
+    std::cout << mat.shape() << std::endl;
+    gml::tensor<long double> tens = m;
+    std::cout << tens << std::endl;
+    tens = mat;
+    std::cout << tens << std::endl;
+    tens = m;
+    mat = tens;
+    std::cout << mat << std::endl;
+    mat = vec;
+    std::cout << mat << std::endl;
+    vec = mat;
+    std::cout << vec << std::endl;
     return 0;
 }

@@ -91,9 +91,9 @@ namespace gml {
             else
                 throw exceptions::invalid_tsr_format{"Error: invalid .tsr format (invalid header).\n"};
         }
-        matrix(T *_data, unsigned int rank, uint64_t *_s, bool copy_shape = true) :
+        matrix(T *_data, int64_t rank, uint64_t *_s, bool copy_shape = true) :
         tensor<T>{_data, rank, _s, copy_shape} {}
-        matrix(T *_data, unsigned int rank, uint64_t *_s, uint64_t _volume, bool copy_shape = true) :
+        matrix(T *_data, int64_t rank, uint64_t *_s, uint64_t _volume, bool copy_shape = true) :
         tensor<T>{_data, rank, _s, _volume, copy_shape} {}
     public:
         matrix() : tensor<T>{tensor_shape{0, 0}} {
@@ -136,14 +136,20 @@ namespace gml {
             }
             tensor<T>::_shape.sizes[0] = sub_elems;
         }
+        matrix(const matrix<T> &other) : tensor<T>{other} {}
+        // only when a matrix is moved from will it be allowed to be a properly empty tensor with `_r == -1`:
+        matrix(matrix<T> &&other) noexcept : tensor<T>{other} { /*
+            tensor<T>::_shape._r = 2;
+            tensor<T>::_shape._s = other._shape._s;
+            tensor<T>::_shape.sizes = other._shape.sizes;
+            tensor<T>::vol = other.vol;
+            tensor<T>::data = other.data; */
+        }
         matrix &reshape(const tensor_shape &new_shape) override {
-            if (this->vol != new_shape.volume())
-                throw exceptions::dimension_mismatch_error{"Error: cannot reshape to requested shape as this would "
-                                                           "require modifying the number of elements.\n"};
             if (new_shape._r != 2)
                 throw exceptions::dimension_mismatch_error{"Error: a matrix must have a rank of 2.\n"};
-            this->_shape = new_shape;
-            return *this;
+            // be aware that this results in an extra redundant boolean check:
+            return dynamic_cast<matrix<T>&>(tensor<T>::reshape(new_shape));
         }
         T &at(const std::initializer_list<uint64_t> &indices) override {
             if (indices.size() != 2)
@@ -173,11 +179,27 @@ namespace gml {
             out.close();
             return pos;
         }
-        virtual T &operator()(uint64_t _i, uint64_t _j) noexcept { // doesn't throw, so must be careful when called
+        virtual T &operator()(uint64_t _i, uint64_t _j) { // `noexcept` not specified as derived classes throw here
             return *(tensor<T>::data + _i*(*(tensor<T>::_shape._s + 1)) + _j);
         }
-        virtual const T &operator()(uint64_t _i, uint64_t _j) const noexcept {
+        virtual const T &operator()(uint64_t _i, uint64_t _j) const {
             return *(tensor<T>::data + _i*(*(tensor<T>::_shape._s + 1)) + _j);
+        }
+        virtual matrix &operator=(const matrix<T> &other) {
+            return dynamic_cast<matrix<T>&>(tensor<T>::operator=(other));
+        }
+        virtual matrix &operator=(matrix<T> &&other) {
+            return dynamic_cast<matrix<T>&>(tensor<T>::operator=(std::move(other)));
+        }
+        matrix &operator=(const tensor<T> &other) {
+            if (other._shape._r != 2)
+                throw exceptions::dimension_mismatch_error{"Error: only 2D tensors can be assigned to matrices.\n"};
+            return dynamic_cast<matrix<T>&>(tensor<T>::operator=(other));
+        }
+        matrix &operator=(tensor<T> &&other) {
+            if (other._shape._r != 2)
+                throw exceptions::dimension_mismatch_error{"Error: only 2D tensors can be assigned to matrices.\n"};
+            return dynamic_cast<matrix<T>&>(tensor<T>::operator=(std::move(other)));
         }
         template <Numeric U, Numeric V>
         friend matrix<mulComT<U, V>> operator*(const matrix<U> &m1, const matrix<V> &m2) {
@@ -216,6 +238,10 @@ namespace gml {
             *(nshape + 1) = _m;
             return {pdata, m1._shape._r, nshape, _volume, false}; // ctor WON'T make a copy of shape array
         }
+        template <Numeric U>
+        friend class matrix;
+        template <Numeric U, bool isCV>
+        friend class vector;
     };
 }
 #endif

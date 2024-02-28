@@ -172,7 +172,7 @@ namespace gml {
         //     if (alloc)
         //         this->_s = new ull_t[0];
         // }
-        tensor_shape(unsigned int rank, uint64_t *_shape, bool make_copy = true) : _r{rank} {
+        tensor_shape(int64_t rank, uint64_t *_shape, bool make_copy = true) : _r{rank} {
             /* Private ctor for efficient construction of a tensor_shape object (used internally by other classes). */
             /* This ctor is never called for creating a shape describing an empty tensor. */
             if (make_copy) {
@@ -299,7 +299,7 @@ namespace gml {
         friend class tensor;
         template <Numeric T>
         friend class matrix;
-        template <Numeric T>
+        template <Numeric T, bool isColVec>
         friend class vector;
         friend bool operator==(const tensor_shape&, const tensor_shape&);
         friend bool operator!=(const tensor_shape&, const tensor_shape&);
@@ -534,7 +534,7 @@ namespace gml {
             gen::memcopy(this->data, other.data, sizeof(T), other.vol);
         }
         tensor(tensor<T> &&other) noexcept : _shape{std::move(other._shape)}, vol{other.vol}, data{other.data} {
-            other._shape.make_empty();
+            // other._shape.make_empty(); // redundant because the move already leaves the other shape empty
             other.vol = 0;
             other.data = nullptr; // the other tensor object is left empty (not 0D, but properly empty)
         }
@@ -581,6 +581,11 @@ namespace gml {
             if (this->vol != new_shape.volume())
                 throw exceptions::dimension_mismatch_error{"Error: cannot reshape to requested shape as this would "
                                                            "require modifying the number of elements.\n"};
+            if (new_shape._r == this->_shape._r) { // case for new shape being same rank, more efficient not to realloc.
+                gml::gen::memcopy(this->_shape._s, new_shape._s, sizeof(uint64_t), new_shape._r);
+                this->_shape.calc_sizes();
+                return *this;
+            }
             this->_shape = new_shape;
             return *this;
         }
@@ -636,6 +641,33 @@ namespace gml {
             out.close();
             return bytes;
         }
+        virtual tensor &operator=(const tensor<T> &other) {
+            if (&other == this)
+                return *this;
+            this->_shape = other._shape;
+            this->vol = other.vol;
+            if (!this->vol) { // volume can never be zero for a 0D tensor (will always be 1)
+                if (this->_shape._r >= 1)
+                    this->data = new T[this->vol];
+                else
+                    this->data = nullptr; // case for a truly tempty tensor with `_r == -1`
+                return *this;
+            }
+            this->data = new T[this->vol];
+            gen::memcopy(this->data, other.data, sizeof(T), this->vol);
+            return *this;
+        }
+        virtual tensor &operator=(tensor<T> &&other) { // not marked `noexcept` due to derived classes overriding
+            if (&other == this)
+                return *this;
+            this->_shape = std::move(other._shape);
+            this->vol = other.vol;
+            this->data = other.data;
+            // other._shape.make_empty();
+            other.vol = 0;
+            other.data = nullptr;
+            return *this;
+        }
         ~tensor() {
             delete [] data;
         }
@@ -646,7 +678,7 @@ namespace gml {
                                                            "between tensors of equal shapes.\n"};
             if (t1._shape._r == -1) // case for addition between two empty tensors
                 return {}; // empty tensor returned
-            addComT<U, V> _ndata = new addComT<U, V>[t1.vol];
+            addComT<U, V> *_ndata = new addComT<U, V>[t1.vol];
             uint64_t counter = t1.vol;
             addComT<U, V> *nptr = _ndata;
             U *d1 = t1.data;
@@ -662,7 +694,7 @@ namespace gml {
                                                            "between tensors of equal shapes.\n"};
             if (t1._shape._r == -1)
                 return {};
-            subComT<U, V> _ndata = new subComT<U, V>[t1.vol];
+            subComT<U, V> *_ndata = new subComT<U, V>[t1.vol];
             uint64_t counter = t1.vol;
             subComT<U, V> *nptr = _ndata;
             U *d1 = t1.data;
@@ -675,7 +707,7 @@ namespace gml {
         friend tensor<mulComT<U, V>> operator*(const U &scalar, const tensor<V> &tens) {
             if (tens._shape._r == -1)
                 return {};
-            mulComT<U, V> _ndata = new mulComT<U, V>[tens.vol];
+            mulComT<U, V> *_ndata = new mulComT<U, V>[tens.vol];
             uint64_t counter = tens.vol;
             mulComT<U, V> *nptr = _ndata;
             V *vptr = tens.data;
@@ -687,7 +719,7 @@ namespace gml {
         friend tensor<divComT<U, V>> operator/(const tensor<U> &tens, const V &scalar) {
             if (tens._shape._r == -1)
                 return {};
-            divComT<U, V> _ndata = new divComT<U, V>[tens.vol];
+            divComT<U, V> *_ndata = new divComT<U, V>[tens.vol];
             uint64_t counter = tens.vol;
             divComT<U, V> *nptr = _ndata;
             U *vptr = tens.data;
@@ -701,6 +733,12 @@ namespace gml {
         friend bool operator==(const tensor<U>&, const tensor<V>&);
         template <Numeric U, Numeric V>
         friend bool operator!=(const tensor<U>&, const tensor<V>&);
+        template <Numeric U>
+        friend class tensor; // so all `tensor<T>` classes are friends with each other
+        template <Numeric U>
+        friend class matrix; // have to also declare these so different types can be used with each other in functions
+        template <Numeric U, bool isCV>
+        friend class vector;
     };
     template <Numeric T>
     std::ostream &operator<<(std::ostream &os, const tensor<T> &tens) {
