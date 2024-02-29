@@ -128,7 +128,7 @@ namespace gml {
             T *dptr = tensor<T>::data;
             while (li_size --> 0) {
                 if (ptr->size() != sub_elems) {
-                    delete [] tensor<T>::data; // is this safe? - because of stack unwinding in exception throwing
+                    delete [] tensor<T>::data; // it is necessary to free the memory before throwing
                     throw std::invalid_argument{"Error: sizes of nested initializer lists do not match.\n"};
                 }
                 gen::memcopy(dptr, ptr++->begin(), sizeof(T), sub_elems);
@@ -138,7 +138,7 @@ namespace gml {
         }
         matrix(const matrix<T> &other) : tensor<T>{other} {}
         // only when a matrix is moved from will it be allowed to be a properly empty tensor with `_r == -1`:
-        matrix(matrix<T> &&other) noexcept : tensor<T>{other} { /*
+        matrix(matrix<T> &&other) noexcept : tensor<T>{std::move(other)} { /*
             tensor<T>::_shape._r = 2;
             tensor<T>::_shape._s = other._shape._s;
             tensor<T>::_shape.sizes = other._shape.sizes;
@@ -151,6 +151,7 @@ namespace gml {
             // be aware that this results in an extra redundant boolean check:
             return dynamic_cast<matrix<T>&>(tensor<T>::reshape(new_shape));
         }
+        using tensor<T>::at;
         T &at(const std::initializer_list<uint64_t> &indices) override {
             if (indices.size() != 2)
                 throw exceptions::indexing_dimension_error{"Error: exactly two indices must be given to index a "
@@ -238,9 +239,9 @@ namespace gml {
             *(nshape + 1) = _m;
             return {pdata, m1._shape._r, nshape, _volume, false}; // ctor WON'T make a copy of shape array
         }
-        template <Numeric U>
+        template <Numeric>
         friend class matrix;
-        template <Numeric U, bool isCV>
+        template <Numeric>
         friend class vector;
     };
 }

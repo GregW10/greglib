@@ -295,11 +295,11 @@ namespace gml {
             delete [] sizes;
         }
         friend std::ostream &operator<<(std::ostream&, const tensor_shape&);
-        template <Numeric T>
+        template <Numeric>
         friend class tensor;
-        template <Numeric T>
+        template <Numeric>
         friend class matrix;
-        template <Numeric T, bool isColVec>
+        template <Numeric>
         friend class vector;
         friend bool operator==(const tensor_shape&, const tensor_shape&);
         friend bool operator!=(const tensor_shape&, const tensor_shape&);
@@ -644,17 +644,41 @@ namespace gml {
         virtual tensor &operator=(const tensor<T> &other) {
             if (&other == this)
                 return *this;
+            if (!other.vol) { // volume can never be zero for a 0D tensor (will always be 1)
+                if (!this->vol) {
+                    if (other._shape._r == -1) {
+                        if (this->_shape._r == -1) {
+                            return *this; // both tensors are truly empty tensors so must already be equivalent
+                        } else {
+                            delete [] this->data;
+                            this->data = nullptr;
+                        }
+                    } else {
+                        if (this->_shape._r == -1) {
+                            this->data = new T[0];
+                        } /* else {
+                            // no need to free T[0] and allocate a new T[0] array
+                        } */
+                    }
+                } else {
+                    delete [] this->data;
+                    if (other._shape._r >= 1)
+                        this->data = new T[0];
+                    else
+                        this->data = nullptr; // case for a truly tempty tensor with `_r == -1`
+                }
+                // return *this;
+            } else {
+                if (this->vol != other.vol) {
+                    delete [] this->data;
+                    this->data = new T[other.vol];
+                }
+                gen::memcopy(this->data, other.data, sizeof(T), other.vol);
+            }
+            // this->data = new T[other.vol];
+            // gen::memcopy(this->data, other.data, sizeof(T), other.vol);
             this->_shape = other._shape;
             this->vol = other.vol;
-            if (!this->vol) { // volume can never be zero for a 0D tensor (will always be 1)
-                if (this->_shape._r >= 1)
-                    this->data = new T[this->vol];
-                else
-                    this->data = nullptr; // case for a truly tempty tensor with `_r == -1`
-                return *this;
-            }
-            this->data = new T[this->vol];
-            gen::memcopy(this->data, other.data, sizeof(T), this->vol);
             return *this;
         }
         virtual tensor &operator=(tensor<T> &&other) { // not marked `noexcept` due to derived classes overriding
@@ -662,6 +686,7 @@ namespace gml {
                 return *this;
             this->_shape = std::move(other._shape);
             this->vol = other.vol;
+            delete [] this->data;
             this->data = other.data;
             // other._shape.make_empty();
             other.vol = 0;
@@ -733,11 +758,11 @@ namespace gml {
         friend bool operator==(const tensor<U>&, const tensor<V>&);
         template <Numeric U, Numeric V>
         friend bool operator!=(const tensor<U>&, const tensor<V>&);
-        template <Numeric U>
+        template <Numeric>
         friend class tensor; // so all `tensor<T>` classes are friends with each other
-        template <Numeric U>
+        template <Numeric>
         friend class matrix; // have to also declare these so different types can be used with each other in functions
-        template <Numeric U, bool isCV>
+        template <Numeric>
         friend class vector;
     };
     template <Numeric T>
