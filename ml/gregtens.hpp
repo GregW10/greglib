@@ -541,6 +541,13 @@ namespace gml {
         explicit tensor(const char *tsr_path) /* : _shape{false} */ {
             process_tsr(tsr_path);
         }
+        tensor<T> &assign(const T &value) {
+            uint64_t counter = this->vol;
+            T *ptr = this->data;
+            while (counter --> 0)
+                *ptr++ = value;
+            return *this;
+        }
         template <typename ...types> requires (std::is_integral<types>::value && ...)
         T &at(types... indices) { // no checking performed to not affect efficiency, so could produce SIGSEGV
             return *(this->data + this->_shape.offset_at(indices...));
@@ -764,6 +771,8 @@ namespace gml {
         friend class matrix; // have to also declare these so different types can be used with each other in functions
         template <Numeric>
         friend class vector;
+        template <Numeric>
+        friend class ffnn;
     };
     template <Numeric T>
     std::ostream &operator<<(std::ostream &os, const tensor<T> &tens) {

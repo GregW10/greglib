@@ -1,0 +1,581 @@
+\documentclass{article}
+\usepackage{graphicx} % Required for inserting images
+% \usepackage{sectsty}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{geometry}
+\usepackage[colorlinks]{hyperref}
+\usepackage{cleveref}
+\usepackage{comment}
+\usepackage{titlesec}
+
+\geometry{margin=2cm}
+
+\newcommand{\pc}[0]{\phantom{,}}
+\newcommand{\pd}[0]{\phantom{.}}
+
+\titleformat{\section}{\Huge\bfseries}{\thesection}{1em}{}
+\titleformat{\subsection}{\huge\bfseries}{\thesubsection}{1em}{}
+\titleformat{\subsubsection}{\Large\bfseries}{\thesubsubsection}{1em}{}
+
+\title{Backpropagation}
+\author{Gregor Hartl Watters}
+\date{February 2024}
+
+\begin{document}
+
+% \allsectionsfont{\Large}
+
+\setlength{\parindent}{0pt}
+
+\Large
+
+\maketitle
+
+\section{Single-Hidden-Layer Neural Network}
+\label{sec:1hl}
+
+\noindent
+
+The input to the network is $\mathbf{x}$, which goes through a matrix multiplication, followed by an activation and then another matrix multiplication to produce the output, $\mathbf{f}$,
+
+\begin{equation}
+\label{eq:nn}
+    \mathbf{x} \rightarrow \mathbf{g} = V\mathbf{x} \rightarrow \mathbf{h} = \sigma(\mathbf{g}) \rightarrow \mathbf{f} = W\mathbf{h},
+\end{equation}
+where
+\begin{equation}
+    \phantom{,}\mathbf{x} \in \mathbb{R}^D,
+\end{equation}
+\begin{equation}
+    \phantom{,}\mathbf{g},\mathbf{h} \in \mathbb{R}^H,
+\end{equation}
+\begin{equation}
+    \phantom{,}\mathbf{y},\mathbf{f} \in \mathbb{R}^F,
+\end{equation}
+\begin{equation}
+    \phantom{,}V \in \mathbb{R}^{H \times D},
+\end{equation}
+and
+\begin{equation}
+    \phantom{.}W \in \mathbb{R}^{F \times H}.
+\end{equation}
+
+\vspace{10pt}
+Note that the input vector $\mathbf{x}$ has a $1$ appended as an extra dimension and that all matrices of weights have an extra column appended with bias terms $b_1,b_2,...,b_N$ (these are already assumed to be included within the above dimensions).
+
+\subsection{Finding the Rate of Change of the Loss w.r.t. the Second Set of Weights, \texorpdfstring{$\frac{\partial L}{\partial W}$}{dl/dW}}
+The loss function is
+\begin{equation}
+    \phantom{,}L = \left|\mathbf{y} - \mathbf{f}\right|^2,
+\end{equation}
+which can be rewritten as a summation,
+\begin{equation}
+    \phantom{.}L = \displaystyle\sum_{i=1}^F (y_i - f_i)^2.
+\end{equation}
+
+Thus, the rate of change of loss function with respect to an output $f_i$ is given as
+\begin{equation}
+    \phantom{,}\frac{\partial L}{\partial f_i} = 2(f_i - y_i),
+\end{equation}
+which can be written in vector form (as a column vector),
+\begin{equation}
+    \phantom{.}\frac{\partial L}{\partial \mathbf{f}} = 2(\mathbf{f} - \mathbf{y}).
+\end{equation}
+
+Now, the rate of change of the loss with respect to the output of the hidden layer will be given by
+\begin{equation}
+    \phantom{,}\frac{\partial L}{\partial \mathbf{h}} = \left(\left(\frac{\partial L}{\partial \mathbf{f}}\right)^T\frac{\partial\mathbf{f}}{\partial \mathbf{h}}\right)^T,
+\end{equation}
+where the transposes arise from wishing to express $\frac{\partial L}{\partial \mathbf{h}}$ as a column vector (and since $\frac{\partial L}{\partial \mathbf{f}}$ is also a column vector). For a single component $h_j$,
+\begin{equation}
+    \phantom{.}\frac{\partial L}{\partial h_j} = \frac{\partial L}{\partial \mathbf{f}}\cdot\frac{\partial\mathbf{f}}{\partial h_j} = \displaystyle\sum_{i=1}^F \frac{\partial L}{\partial f_i}\frac{\partial f_i}{\partial h_j}.
+\end{equation}
+
+The rate of change of a single component in the output vector $f_i$ with respect to a single component in the output of the hidden layer $h_j$ is simply the weight in the matrix which is multiplied by the component in the hidden layer, since
+\begin{equation}
+    \phantom{,}f_i = \displaystyle\sum_{j=1}^H W_{ij} h_j,
+\end{equation}
+so
+\begin{equation}
+    \phantom{,}\frac{\partial f_i}{\partial h_j} = W_{ij},
+\end{equation}
+which means
+\begin{equation}
+    \phantom{.}\frac{\partial \mathbf{f}}{\partial \mathbf{h}} = W.
+\end{equation}
+Therefore,
+\begin{equation}
+\label{eq:dL/dh_j}
+    \phantom{,}\frac{\partial L}{\partial h_j} = \displaystyle\sum_{i=1}^F 2(f_i - y_i)W_{ij},
+\end{equation}
+which can be used to write the entire equation in vector form,
+\begin{align}
+\label{eq:dL/dh}
+    \frac{\partial L}{\partial \mathbf{h}} &= \left(\left(\frac{\partial L}{\partial \mathbf{f}}\right)^TW\right)^T\notag \\
+    &= 2{W}^T (\mathbf{f} - \mathbf{y})
+\end{align}
+
+Now I will derive $\frac{\partial L}{\partial W}$ itself using all of the above. I start with noting the rate of change of the loss with respect to a single component of $W$,
+\begin{equation}
+\label{eq:l_wkl}
+    \phantom{.}\frac{\partial L}{\partial W_{kl}} = \displaystyle\sum_{i=1}^F \frac{\partial L}{\partial f_i}\frac{\partial f_i}{\partial W_{kl}}.
+\end{equation}
+\Cref{eq:l_wkl} is formally the case because
+\begin{align}
+    \phantom{.}L &= L(\mathbf{f}) = L(f_1, f_2,\ldots,f_F) = L(f_1(W),f_2(W),\ldots,f_F(W))\notag \\ &= L(f_1(W_{11},W_{12},\ldots,W_{FH}),f_2(W_{11},W_{12},\ldots,W_{FH}),\ldots,f_F(W_{11},W_{12},\ldots,W_{FH})).
+\end{align}
+However, the sum in \cref{eq:l_wkl} can be simplified by noting that
+\begin{equation}
+    \phantom{,}f_i = \displaystyle\sum_{j=1}^H W_{ij}h_j,
+\end{equation}
+i.e., that $f_i$ is actually only a function of the weights in $W$ that are in row $i$, $f_i = f_i(W_{i1},W_{i2},\ldots,W_{iH})$, so that the derivative of a single component with respect to a given weight $W_{kl}$ becomes
+\begin{equation}
+    \phantom{.}\frac{\partial f_i}{\partial W_{kl}} = \delta_{ik}\displaystyle\sum_{j=1}^H \delta_{lj}h_j = \delta_{ik}h_l.
+\end{equation}
+Thus, this can be plugged into \cref{eq:l_wkl} to produce
+\begin{align}
+    \phantom{.}\frac{\partial L}{\partial W_{kl}} &= \displaystyle\sum_{i=1}^F 2(f_i - y_i)\delta_{ik}h_l = 2h_l\displaystyle\sum_{i=1}^F\delta_{ik}(f_i - y_i\notag) \\ &= 2(f_k - y_k)h_l.
+\end{align}
+Finally, it is simple to note that the above can be rewritten as an outer product,
+\begin{equation}
+    \label{eq:l_w}
+    \phantom{.}\frac{\partial L}{\partial W} = 2(\mathbf{f} - \mathbf{y})\mathbf{h}^T.
+\end{equation}
+At this point, using \cref{eq:l_w}, it would already be possible to optimise the second set of weights $W$ to minimise the prediction error of the NN.
+
+\subsection{Finding the Rate of Change of the Loss w.r.t. the First Set of Weights, \texorpdfstring{$\frac{\partial L}{\partial V}$}{dL/dV}}
+
+In \cref{eq:dL/dh_j}, I already derived $\frac{\partial L}{\partial h_j}$, which can be used to find the rate of change of the loss w.r.t. a component of the input to the hidden layer, $g_k$,
+\begin{equation}
+\label{eq:dl/dg_iSUM}
+    \phantom{.}\frac{\partial L}{\partial g_k} = \displaystyle\sum_{j=1}^H\frac{\partial L}{\partial h_j}\frac{\partial h_j}{\partial g_k}.
+\end{equation}
+Again, the above summation can be simplified enormously by nothing that $h_j = h_j(g_j)$ only (i.e., the $j\textsuperscript{th}$ component of $\mathbf{h}$ is a function only of the $j\textsuperscript{th}$ component of $\mathbf{g}$), namely
+\begin{equation}
+    \phantom{,}h_j(g_k) = \delta_{jk}\sigma(g_k),
+\end{equation}
+where $\sigma$ is the activation function in question. Therefore,
+\begin{equation}
+    \phantom{,}\frac{\partial h_j}{\partial g_k} = \frac{\partial (\delta_{jk}\sigma(g_k))}{\partial g_k} = \delta_{jk}\sigma'(g_k),
+\end{equation}
+which can be inserted into \cref{eq:dl/dg_iSUM} to yield
+\begin{align}
+\label{eq:dL/dg_k}
+    \phantom{.}\frac{\partial L}{\partial g_k} &= \displaystyle\sum_{j=1}^H\frac{\partial L}{\partial h_j}\delta_{jk}\sigma'(g_k)\notag\\
+    &= \frac{\partial L}{\partial h_k}\sigma'(g_k) \\
+    &= \left(\displaystyle\sum_{i=1}^F 2(f_i - y_i)W_{ik}\right)\sigma'(g_k).
+\end{align}
+Though \cref{eq:dL/dg_k} could be written in vector form as
+\begin{equation}
+\label{eq:dL/dgVEC}
+    \phantom{,}\frac{\partial L}{\partial \mathbf{g}} = \left(\left(\frac{\partial L}{\partial \mathbf{h}}\right)^T\frac{\partial \mathbf{h}}{\partial \mathbf{g}}\right)^T,
+\end{equation}
+given that $\frac{\partial \mathbf{h}}{\partial \mathbf{g}}$ is a diagonal matrix, where $\left(\frac{\partial \mathbf{h}}{\partial \mathbf{g}}\right)_{ii} = \sigma'(g_i)$, it is more instructive to write \cref{eq:dL/dgVEC} as a simple Hadamard product between the derivative of the loss w.r.t. the hidden layer output and the vector of derivatives of each input to the hidden layer $g_i$ w.r.t. its output $h_i$,
+\begin{equation}
+\label{eq:dL/dg_hadamard}
+    \phantom{.}\frac{\partial L}{\partial \mathbf{g}} = \phantom{,}\frac{\partial L}{\partial \mathbf{h}} \odot \sigma'(\mathbf{g}).
+\end{equation}
+
+\vspace{10pt}
+Finally, it is now possible to derive the rate of change of the loss w.r.t. a weight in the first layer,
+\begin{equation}
+\label{eq:dL/dV_klSUM}
+    \phantom{.}\frac{\partial L}{\partial V_{kl}} = \displaystyle\sum_{i=1}^H\frac{\partial L}{\partial g_i}\frac{\partial g_i}{\partial V_{kl}}.
+\end{equation}
+From \cref{eq:dL/dg_k}, we know $\frac{\partial L}{\partial g_i}$. To find $\frac{\partial g_i}{\partial V_{kl}}$, it can be noted that
+\begin{equation}
+    \phantom{,}g_i = \displaystyle\sum_{j=1}^D V_{ij}x_j,
+\end{equation}
+thus,
+\begin{align}
+\label{eq:dg_i/dV_kl}
+    \phantom{.}\frac{\partial g_i}{\partial V_{kl}} &= \delta_{ik}\displaystyle\sum_{j=1}^D \delta_{lj}x_j \\&=
+    \delta_{ik}x_l.
+\end{align}
+This can be substituted into \cref{eq:dL/dV_klSUM} to produce
+\begin{align}
+    \phantom{.}\frac{\partial L}{\partial V_{kl}} &= \displaystyle\sum_{i=1}^H\frac{\partial L}{\partial g_i}\delta_{ik}x_l \\
+    &= \frac{\partial L}{\partial g_k}x_l
+\end{align}
+This reveals that the full matrix of derivatives of $L$ with respect to each component of $V$ is
+\begin{equation}
+    \phantom{,}\frac{\partial L}{\partial V} =
+    \begin{bmatrix}
+        \frac{\partial L}{\partial g_1}x_1 & \frac{\partial L}{\partial g_1}x_2 & \cdots & \frac{\partial L}{\partial g_1}x_D \\[0.5em]
+        \frac{\partial L}{\partial g_2}x_1 & \frac{\partial L}{\partial g_2}x_2 & \cdots & \frac{\partial L}{\partial g_2}x_D \\[0.5em]
+        \vdots & \vdots & \ddots & \vdots \\[0.5em]
+        \frac{\partial L}{\partial g_H}x_1 & \frac{\partial L}{\partial g_H}x_2 & \cdots & \frac{\partial L}{\partial g_H}x_D
+    \end{bmatrix},
+\end{equation}
+which can easily be rewritten as an outer product,
+\begin{equation}
+\label{eq:dL/dV_outer_product}
+    \phantom{.}\frac{\partial L}{\partial V} = \frac{\partial L}{\partial \mathbf{g}}\mathbf{x}^T.
+\end{equation}
+Finally, the full form of \cref{eq:dL/dV_outer_product} can be written by making use of \cref{eq:dL/dg_hadamard} and \cref{eq:dL/dh},
+\begin{align}
+\label{eq:dL/dV}
+    \phantom{.}\frac{\partial L}{\partial V} &= \left(\frac{\partial L}{\partial \mathbf{h}}\odot\sigma'(\mathbf{g})\right)\mathbf{x}^T \\
+    &= 2\left({W}^T(\mathbf{f} - \mathbf{y})\odot\sigma'(\mathbf{g})\right)\mathbf{x}^T
+\end{align}
+
+\newpage
+
+\section{Multi-layer Neural Network}
+\label{sec:multi}
+
+\subsection{Network Architecture}
+\label{sec:arch}
+
+I will start by defining the architecture of the full network. The network will consist of $N$ hidden layers, followed by a single linear (output) layer. Passing an input through hidden layer $n$ consists of a matrix multiplication by weights (with incorporated biases) $W^n$, followed by the application of activation function $\sigma_n$.
+
+\vspace{1em}
+The input to the $n\textsuperscript{th}$ hidden layer is taken as $\mathbf{h}^{n-1}$. The intermediate vector in the $n\textsuperscript{th}$ layer produced by the matrix multiplication of $W^n$ by $\mathbf{h}^{n-1}$ is taken as $\mathbf{g}^n$, and the output of the layer (after the activation function $\sigma_n$ is applied) is taken as $\mathbf{h}^n$. Hence, as was probably already clear, the output of layer $n$ is taken as the input to layer $n + 1$ (so $\mathbf{h}^n$ is taken as the input in layer $n + 1$). This architecture is more clearly defined below.
+
+\begin{align}
+\label{proc:full_nn}
+    &\mathbf{h}^0\rightarrow&\mathbf{g}^1 = W^1\mathbf{h}^0\rightarrow\mathbf{h}^1 = \sigma_1(\mathbf{g}^1)\quad&\mathbf{g}^1,\mathbf{h}^1\in\mathbb{R}^{D_1}\quad &W^1\in\mathbb{R}^{D_1\times D_0}\notag \\
+    &\mathbf{h}^1\rightarrow&\mathbf{g}^2 = W^2\mathbf{h}^1\rightarrow\mathbf{h}^2 = \sigma_2(\mathbf{g}^2)\quad&\mathbf{g}^2,\mathbf{h}^2\in\mathbb{R}^{D_2}\quad &W^2\in\mathbb{R}^{D_2\times D_1}\notag \\
+    &\mathbf{h}^2\rightarrow&\mathbf{g}^3 = W^3\mathbf{h}^2\rightarrow\mathbf{h}^3 = \sigma_3(\mathbf{g}^3)\quad&\mathbf{g}^3,\mathbf{h}^3\in\mathbb{R}^{D_3}\quad &W^3\in\mathbb{R}^{D_3\times D_2}\notag \\
+    &\vdots&&\vdots&\vdots\notag \\
+    &\mathbf{h}^{N-1}\rightarrow&\mathbf{g}^N = W^N\mathbf{h}^{N-1}\rightarrow\mathbf{h}^N = \sigma_N(\mathbf{g}^N)\quad&\mathbf{g}^N,\mathbf{h}^N\in\mathbb{R}^{D_N}\quad &W^N\in\mathbb{R}^{D_N\times D_{N-1}}\notag \\
+    &\mathbf{h}^N\rightarrow&\mathbf{f} = W^F\mathbf{h}^N\quad&\mathbf{f}\in\mathbb{R}^{D_F}\quad &W^F\in\mathbb{R}^{D_F\times D_N}
+\end{align}
+
+\vspace{1em}
+As is probably apparent, $\mathbf{h}^0$ is the initial input to the entire network (equivalent to $\mathbf{x}$ used in \cref{sec:1hl}). $\mathbf{f}$ is the output of the entire network, and $\mathbf{y}$ (not shown yet), again, is taken as the vector of ``true'' values the network is attempting to predict. Importantly, in this section I will be treating derivatives of the loss function with respect to a vector as a row vector - I made this choice since this format is the ``natural'' output one obtains from applying the chain rule with vectors and matrices.
+
+\subsection{Finding \texorpdfstring{$\frac{\partial L}{\partial \mathbf{f}}$}{dL/df}}
+\label{sec:dL/df}
+
+This process will be almost identical to that in the single-hidden-layer network. Again, the loss is given by
+\begin{align}
+    \pd L &= \left|\mathbf{y} - \mathbf{f}\right|^2\notag \\
+    &= \displaystyle\sum_{i=1}^{D_F}\left(y_i - f_i\right)^2.
+\end{align}
+Thus, the derivative of the loss function w.r.t. a component of the output vector $\mathbf{f}$ is still
+\begin{equation}
+    \phantom{,}\frac{\partial L}{\partial f_i} = 2(f_i - y_i),
+\end{equation}
+which makes the derivative w.r.t. the entire vector
+\begin{equation}
+\label{eq:dL/df}
+    \phantom{,}\frac{\partial L}{\partial \mathbf{f}} = 2(\mathbf{f} - \mathbf{y})^T,
+\end{equation}
+though the transpose is taken in order to ensure the derivative is a row vector (for reasons explained above).
+
+\subsection{Finding \texorpdfstring{$\frac{\partial L}{\partial W^F}$}{dL/dWF}}
+\label{sec:dL/dWF}
+
+I start by taking the rate of change of the loss w.r.t. a single component of $W^F$,
+\begin{equation}
+\label{eq:dL/dWF_klFIRST}
+    \phantom{.}\frac{\partial L}{\partial W^F_{kl}} = \displaystyle\sum_{i=1}^{D_F}\frac{\partial L}{\partial f_i}\frac{\partial f_i}{\partial W^F_{kl}}.
+\end{equation}
+Noting the fact that
+\begin{equation}
+\label{eq:fiSUM}
+    \phantom{,}f_i = \displaystyle\sum_{l=1}^{D_N}W^F_{il}h^N_l,
+\end{equation}
+the derivative of a single component of $\mathbf{f}$ w.r.t. a single component of $W^F$ can be written as
+\begin{align}
+    \phantom{,}\frac{\partial f_i}{\partial W^F_{kl}} &= \delta_{ik}\displaystyle\sum_{j=1}^{D_N}\delta_{lj}h^N_j\notag \\
+    &= \delta_{ik}h^N_l,
+\end{align}
+where the outer Kronecker delta arises from the fact that $f_i$ is only a function of the weights in row $i$ of $W^F$, hence the gradient of $f_i$ w.r.t. a weight in $W^F$ which does not contribute to $f_i$ is zero. Thus, \cref{eq:dL/dWF_klFIRST} can be rewritten as
+\begin{align}
+    \phantom{.}\frac{\partial L}{\partial W^F_{kl}} &= \displaystyle\sum_{i=1}^{D_F}\frac{\partial L}{\partial f_i}\delta_{ik}h^N_l\notag \\
+    &= \frac{\partial L}{\partial f_k}h^N_l.
+\end{align}
+The above equation can be used for all elements of $W^F$, which produces
+\begin{align}
+    \phantom{,}\frac{\partial L}{\partial W^F} &=
+    %\begin{bmatrix}
+        %\frac{\partial L}{\partial f_1}\frac{\partial f_1}{\partial W^F_{11}}\quad &
+        %\frac{\partial L}{\partial f_1}\frac{\partial f_1}{\partial W^F_{12}}\quad &
+        %\cdots\quad &
+        %\frac{\partial L}{\partial f_1}\frac{\partial f_1}{\partial W^F_{1 D_N}} \\[0.5em]
+        %\frac{\partial L}{\partial f_2}\frac{\partial f_2}{\partial W^F_{21}}\quad &
+        %\frac{\partial L}{\partial f_2}\frac{\partial f_2}{\partial W^F_{22}}\quad &
+        %\cdots\quad &
+        %\frac{\partial L}{\partial f_2}\frac{\partial f_2}{\partial W^F_{2 D_N}} \\[0.5em]
+        %\vdots & \vdots & \ddots & \vdots \\[0.5em]
+        %\frac{\partial L}{\partial f_{D_F}}\frac{\partial f_{D_F}}{\partial W^F_{D_F 1}}\quad &
+        %\frac{\partial L}{\partial f_{D_F}}\frac{\partial f_{D_F}}{\partial W^F_{D_F 2}}\quad &
+        %\cdots\quad &
+        %\frac{\partial L}{\partial f_{D_F}}\frac{\partial f_{D_F}}{\partial W^F_{D_F D_N}}
+    %\end{bmatrix}\notag \\[0.5em]
+    %&=
+    \begin{bmatrix}
+        \frac{\partial L}{\partial f_1}h^N_1\quad &
+        \frac{\partial L}{\partial f_1}h^N_2\quad &
+        \cdots\quad &
+        \frac{\partial L}{\partial f_1}h^N_{D_N} \\[0.5em]
+        \frac{\partial L}{\partial f_2}h^N_1\quad &
+        \frac{\partial L}{\partial f_2}h^N_2\quad &
+        \cdots\quad &
+        \frac{\partial L}{\partial f_2}h^N_{D_N} \\[0.5em]
+        \vdots & \vdots & \ddots & \vdots \\[0.5em]
+        \frac{\partial L}{\partial f_{D_F}}h^N_1\quad &
+        \frac{\partial L}{\partial f_{D_F}}h^N_2\quad &
+        \cdots\quad &
+        \frac{\partial L}{\partial f_{D_F}}h^N_{D_N}
+    \end{bmatrix}\notag \\[0.5em]
+    &= \left(\frac{\partial L}{\partial \mathbf{f}}\right)^T\left(\mathbf{h}^N\right)^T,
+\end{align}
+i.e., the rate of change of the loss w.r.t. every single element of the final matrix $W^F$ of the multi-layer network. Finally, by substituting in \cref{eq:dL/df}, this can be rewritten as
+\begin{equation}
+    \pd\frac{\partial L}{\partial W^F} = 2(\mathbf{f} - \mathbf{y})^T\left(\mathbf{h}^N\right)^T.
+\end{equation}
+
+
+\subsection{Finding \texorpdfstring{$\frac{\partial L}{\partial \mathbf{h}^N}$}{dL/dhN}}
+\label{sec:dL/dhN}
+
+Now, in order to derive $\frac{\partial L}{\partial \mathbf{h}^N}$, I start by noting the rate of a change of $L$ w.r.t. a single component of $\mathbf{h}^N$,
+\begin{equation}
+\label{eq:dL/dhN_j}
+    \phantom{,}\frac{\partial L}{\partial h^N_j} = \displaystyle\sum_{i=1}^{D_F}\frac{\partial L}{\partial f_i}\frac{\partial f_i}{\partial h^N_j},
+\end{equation}
+where the sum is required because $L = L(\mathbf{f}) = L(f_1,f_2,\ldots,f_{D_F})$, i.e., the loss is a function of all components of $\mathbf{f}$, and $f_i = f_i(h^N_1,h^N_2,\ldots,h^N_{D_N})$, i.e., each component of $\mathbf{f}$ is a function of all components of $\mathbf{h}^N$. Given \cref{eq:fiSUM}, the derivative of this component with respect to a given component $h^N_j$ is simply
+\begin{align}
+\label{eq:df_i/dhN_j}
+    \phantom{.}\frac{\partial f_i}{\partial h^N_j} &= \displaystyle\sum_{l=1}^{D_N}\delta_{jl}W^F_{il}\notag \\
+    &= W^F_{ij}.
+\end{align}
+Thus, it is easy to see that the derivative of the full output $\mathbf{f}$ w.r.t. the full output of the last hidden layer $\mathbf{h}^N$ (i.e. the Jacobian) is
+\begin{align}
+    \frac{\partial \mathbf{f}}{\partial \mathbf{h}^N} &=
+    \begin{bmatrix}
+        \frac{\partial f_1}{\partial h^N_1} & \frac{\partial f_1}{\partial h^N_2} & \cdots & \frac{\partial f_1}{\partial h^N_{D_N}} \\[1em]
+        \frac{\partial f_2}{\partial h^N_1} & \frac{\partial f_2}{\partial h^N_2} & \cdots & \frac{\partial f_2}{\partial h^N_{D_N}} \\[1em]
+        \vdots & \vdots & \ddots & \vdots \\[1em]
+        \frac{\partial f_{D_F}}{\partial h^N_1} & \frac{\partial f_{D_F}}{\partial h^N_2} & \cdots & \frac{\partial f_{D_F}}{\partial h^N_{D_N}}
+    \end{bmatrix}\notag \\
+    &=
+    \begin{bmatrix}
+        W^F_{11} & W^F_{12} & \cdots & W^F_{1D_N} \\
+        W^F_{21} & W^F_{22} & \cdots & W^F_{2D_N} \\
+        \vdots & \vdots & \ddots & \vdots \\
+        W^F_{D_F 1} & W^F_{D_F 2} & \cdots & W^F_{D_F D_N}
+    \end{bmatrix}\notag \\
+    &= W^F
+\end{align}
+
+\vspace{1em}
+Now, \cref{eq:dL/dhN_j} can be rewritten using \cref{eq:df_i/dhN_j},
+\begin{equation}
+    \phantom{.}\frac{\partial L}{\partial h^N_j} = \displaystyle\sum_{i=1}^{D_F}\frac{\partial L}{\partial f_i}W^F_{ij}.
+\end{equation}
+Since the above is just one component of the row vector of the rate of change of the loss w.r.t. the output from the last hidden layer, the full vector can be written as
+\begin{align}
+    \pd\frac{\partial L}{\partial \mathbf{h}^N} &=
+    \begin{bmatrix}
+        \displaystyle\sum_{i=1}^{D_F}\frac{\partial L}{\partial f_i}W^F_{i1}\quad & \displaystyle\sum_{i=1}^{D_F}\frac{\partial L}{\partial f_i}W^F_{i2}\quad & \cdots\quad & \displaystyle\sum_{i=1}^{D_F}\frac{\partial L}{\partial f_i}W^F_{i D_N}
+    \end{bmatrix}\notag \\[0.5em]
+    % &=
+    % \begin{bmatrix}
+        % \displaystyle\sum_{i=1}^{D_F}2(f_i - y_i)W^F_{i1}\quad & \displaystyle\sum_{i=1}^{D_F}2(f_i - y_i)W^F_{i2}\quad & \cdots\quad & \displaystyle\sum_{i=1}^{D_F}2(f_i - y_i)W^F_{i D_N}
+    % \end{bmatrix}
+    &= \frac{\partial L}{\partial \mathbf{f}}W^F\notag \\[0.5em]
+    &= \frac{\partial L}{\partial \mathbf{f}}\frac{\partial \mathbf{f}}{\partial \mathbf{h}^N}.
+\end{align}
+Finally, by substituting in \cref{eq:dL/df}, the above can be rewritten as
+\begin{equation}
+    \pd\frac{\partial L}{\partial \mathbf{h}^N} = 2(\mathbf{f} - \mathbf{y})^T W^F.
+\end{equation}
+
+% \vspace{1em}
+% Next, I will derive the rate of change of the loss $L$ w.r.t. the output from the last hidden layer, $\mathbf{h}^N$, using the above relations. To begin with, I will explicitly write out the rate of change of $L$ w.r.t. to a single component in the output of the last hidden layer $h^N_$
+
+\subsection{Finding \texorpdfstring{$\frac{\partial L}{\partial \mathbf{g}^N}$}{dL/dgN}}
+\label{sec:dL/dgN}
+
+The rate of change of the loss w.r.t. a single element of $\mathbf{g}^N$ will be given by
+\begin{equation}
+\label{eq:full_dL/dgNj}
+    \pd\frac{\partial L}{\partial g^N_j} = \displaystyle\sum_{i=1}^{D_N} \frac{\partial L}{\partial h^N_i}\frac{\partial h^N_i}{\partial g^N_j}.
+\end{equation}
+However, since $h^N_i = \sigma^N(g^N_i)$, $h^N_i = h^N_i(g^N_i)$, i.e., $h^N_i$ is a function of $g^N_i$ only, so
+\begin{equation}
+    \pc\frac{\partial h^N_i}{\partial g^N_j} = \delta_{ij}\frac{d h^N_i}{d g^N_i} = \delta_{ij}\frac{d \sigma^N\left(g^N_i\right)}{d g^N_i},
+\end{equation}
+which means \cref{eq:full_dL/dgNj} can be rewritten as
+\begin{align}
+    \pd\frac{\partial L}{\partial g^N_j} &= \displaystyle\sum_{i=1}^{D_N} \frac{\partial L}{\partial h^N_i}\delta_{ij}\frac{d \sigma^N\left(g^N_i\right)}{d g^N_i}\notag \\
+    &= \frac{\partial L}{\partial h^N_j}\frac{d\sigma^N\left(g^N_j\right)}{d g^N_j}\notag \\
+    &= \frac{\partial L}{\partial h^N_j}{\sigma^{N}}^{\prime}\left(g^N_j\right)
+\end{align}
+Thus, the full derivative of the loss function w.r.t. each component of $\mathbf{g}^N$ can be written as
+\begin{align}
+    \pc\frac{\partial L}{\partial \mathbf{g}^N} &=
+    \begin{bmatrix}
+        \frac{\partial L}{\partial g^N_1} & \frac{\partial L}{\partial g^N_2} & \cdots & \frac{\partial L}{\partial g^N_{D_N}}
+    \end{bmatrix}\notag \\
+    &=
+    \begin{bmatrix}
+        \frac{\partial L}{\partial h^N_1}{\sigma^{N}}^{\prime}\left(g^N_1\right)\quad & \frac{\partial L}{\partial h^N_2}{\sigma^{N}}^{\prime}\left(g^N_2\right)\quad & \cdots\quad & \frac{\partial L}{\partial h^N_{D_N}}{\sigma^{N}}^{\prime}\left(g^N_{D_N}\right)
+    \end{bmatrix},
+\end{align}
+which, clearly, must be the Hadamard product
+\begin{align}
+    \label{eq:dL/dgN}
+    \pd\frac{\partial L}{\partial \mathbf{g}^N} &=
+    \begin{bmatrix}
+        \frac{\partial L}{\partial h^N_1} \\[0.5em]
+        \frac{\partial L}{\partial h^N_2} \\[0.5em]
+        \vdots \\[0.5em]
+        \frac{\partial L}{\partial h^N_{D_N}}
+    \end{bmatrix}^T
+    \odot
+    \begin{bmatrix}
+        {\sigma^{N}}^{\prime}\left(g^N_1\right) \\[0.5em]
+        {\sigma^{N}}^{\prime}\left(g^N_2\right) \\[0.5em]
+        \vdots \\[0.5em]
+        {\sigma^{N}}^{\prime}\left(g^N_{D_N}\right)
+    \end{bmatrix}^T\notag \\[1em]
+    %=
+    %\begin{bmatrix}
+        %\frac{\partial L}{\partial h^N_1}{\sigma^{N}}^{\prime}\left(g^N_1\right) \\[0.5em]
+        %\frac{\partial L}{\partial h^N_2}{\sigma^{N}}^{\prime}\left(g^N_2\right) \\[0.5em]
+        %\cdots\quad \\[0.5em]
+        %\frac{\partial L}{\partial h^N_{D_N}}{\sigma^{N}}^{\prime}\left(g^N_{D_N}\right)
+    %\end{bmatrix}
+    &= \frac{\partial L}{\partial \mathbf{h}^N}\odot{\sigma^N}^{\prime}\left(\mathbf{g}^N\right).
+\end{align}
+
+\subsection{Finding \texorpdfstring{$\frac{\partial L}{\partial W^N}$}{dL/dWN}}
+\label{sec:dL/dWN}
+
+I start by noting the rate of change of the loss w.r.t. a single component of the vector $\mathbf{g}^N$,
+\begin{equation}
+\label{eq:dL/dWNklSUM}
+    \pd\frac{\partial L}{\partial W^N_{kl}} = \displaystyle\sum_{i=1}^{D_N}\frac{\partial L}{\partial g^N_i}\frac{\partial g^N_i}{\partial W^N_{kl}}.
+\end{equation}
+However, given that
+\begin{equation}
+    g^N_i = \displaystyle\sum_{j=1}^{D_{N-1}}W^N_{ij}h^{N-1}_j
+\end{equation}
+and, thus,
+\begin{align}
+    \pc\frac{\partial g^N_i}{\partial W^N_{kl}} &= \delta_{ik}\displaystyle\sum_{j=1}^{D_{N-1}}\delta_{lj}h^{N-1}_j\notag \\
+    &= \delta_{ik}h^{N-1}_l,
+\end{align}
+\cref{eq:dL/dWNklSUM} can be rewritten as
+\begin{align}
+\label{eq:dL/dWNkl}
+    \pd\frac{\partial L}{\partial W^N_{kl}} &= \displaystyle\sum_{i=1}^{D_N}\frac{\partial L}{\partial g^N_i}\delta_{ik}h^{N-1}_l\notag \\
+    &= \frac{\partial L}{\partial g^N_k}h^{N-1}_l.
+\end{align}
+Finally, the full rate of change of the loss w.r.t. the entire entire matrix of weights of the $N\textsuperscript{th}$ layer can be expressed as
+\begin{align}
+    \label{eq:dL/dWN}
+    \pd\frac{\partial L}{\partial W^N} &=
+    \begin{bmatrix}
+        \frac{\partial L}{\partial g^N_1}h^{N-1}_1\quad &
+        \frac{\partial L}{\partial g^N_1}h^{N-1}_2\quad &
+        \cdots\quad &
+        \frac{\partial L}{\partial g^N_1}h^{N-1}_{D_{N-1}} \\[1em]
+        \frac{\partial L}{\partial g^N_2}h^{N-1}_1\quad &
+        \frac{\partial L}{\partial g^N_2}h^{N-1}_2\quad &
+        \cdots\quad &
+        \frac{\partial L}{\partial g^N_2}h^{N-1}_{D_{N-1}} \\[1em]
+        \cdots &
+        \cdots &
+        \ddots\quad &
+        \vdots \\[0.5em]
+        \frac{\partial L}{\partial g^N_{D_N}}h^{N-1}_1\quad &
+        \frac{\partial L}{\partial g^N_{D_N}}h^{N-1}_2\quad &
+        \cdots\quad &
+        \frac{\partial L}{\partial g^N_{D_N}}h^{N-1}_{D_{N-1}} \\[1em]
+    \end{bmatrix}\notag \\
+    &= \left(\frac{\partial L}{\partial \mathbf{g}^N}\right)^T\left(\mathbf{h}^{N-1}\right)^T
+\end{align}
+
+\subsection{Finding \texorpdfstring{$\frac{\partial L}{\partial \mathbf{h}^{N-1}}$}{dL/dhNm1}}
+\label{sec:dL/dhNm1}
+
+Again, I will start by writing the rate of change of the loss w.r.t. the rate of change of a single component of $\mathbf{h}^{N-1}$,
+\begin{equation}
+    \label{eq:dL/dhNm1jSUM}
+    \pc\frac{\partial L}{\partial h^{N-1}_j} = \displaystyle\sum_{i=1}^{D_N}\frac{\partial L}{\partial g^N_i}\frac{\partial g^N_i}{\partial h^{N-1}_j},
+\end{equation}
+where the summation is present because the loss is a function of every single component of $\mathbf{g}^N$, and every single component of $\mathbf{g}^N$ is, in turn, a function of every single component of $\mathbf{h}^{N-1}$. Next, it can be noted that
+\begin{equation}
+    \pc\mathbf{g}^N = W^N\mathbf{h}^{N-1},
+\end{equation}
+which means that
+\begin{equation}
+    \pc g^N_i = \displaystyle\sum_{l=1}^{D_{N-1}}W^N_{il}h^{N-1}_l,
+\end{equation}
+making the derivative of a single element of $\mathbf{g}^N$ w.r.t. a single element of $\mathbf{h}^{N-1}$
+\begin{align}
+    \label{eq:dgNi/dhNm1j}
+    \pd\frac{\partial g^N_i}{\partial h^{N-1}_j} &= \displaystyle\sum_{l=1}^{D_{N-1}}\delta_{jl}W^N_{il}\notag \\
+    &= W^N_{ij}.
+\end{align}
+This makes it clear that
+\begin{align}
+    \pd\frac{\partial \mathbf{g}^N}{\partial \mathbf{h}^{N-1}} &=
+    \begin{bmatrix}
+        W^N_{11} & W^N_{12} & \cdots & W^N_{1D_{N-1}} \\[0.5em]
+        W^N_{21} & W^N_{22} & \cdots & W^N_{2D_{N-1}} \\[0.5em]
+        \vdots & \vdots & \ddots & \vdots \\[0.5em]
+        W^N_{D_N1} & W^N_{D_N2} & \cdots & W^N_{D_ND_{N-1}}
+    \end{bmatrix}\notag \\
+    &= W^N.
+\end{align}
+Now, \cref{eq:dgNi/dhNm1j} can be substituted into \cref{eq:dL/dhNm1jSUM} to produce
+\begin{equation}
+    \label{eq:dL/dhNm1j}
+    \pd\frac{\partial L}{\partial h^{N-1}_j} = \displaystyle\sum_{i=1}^{D_N}\frac{\partial L}{\partial g^N_i}W^N_{ij}.
+\end{equation}
+Finally, this can be used to write the full rate of change of the loss w.r.t. the entire vector output of the $(N-1)\textsuperscript{th}$ layer,
+\begin{align}
+    \label{eq:dL/dhNm1}
+    \frac{\partial L}{\partial \mathbf{h}^{N-1}} &=
+    \begin{bmatrix}
+        \displaystyle\sum_{i=1}^{D_N}\frac{\partial L}{\partial g^N_i}W^N_{i1}\quad &
+        \displaystyle\sum_{i=1}^{D_N}\frac{\partial L}{\partial g^N_i}W^N_{i2}\quad &
+        \cdots\quad &
+        \displaystyle\sum_{i=1}^{D_N}\frac{\partial L}{\partial g^N_i}W^N_{iD_{N-1}}
+    \end{bmatrix}\notag \\[1em]
+    &= \frac{\partial L}{\partial \mathbf{g}^N}W^N
+\end{align}
+
+\subsection{Subsequent Layers}
+\label{sec:nextlayers}
+
+For the subsequent layers of the network (i.e. going futher back, towards the input layer), we wish to be able to find $\frac{\partial L}{\partial W^n}$ for every layer $n$, so that the weights $W^n$ may be updated. Instead of re-deriving the above quantities for every layer, it can be noted that the equation for $\frac{\partial L}{\partial W^N}$ (i.e., the rate of change of the loss w.r.t. the rate of change of the weights in the penultimate layer of the network), \cref{eq:dL/dWN}, is expressed in quantities that have been previously worked out, i.e.,
+\begin{equation}
+    \label{eq:dL/dWN_v2}
+    \pd\frac{\partial L}{\partial W^N} = \left(\frac{\partial L}{\partial \mathbf{g}^N}\right)^T\left(\mathbf{h}^{N-1}\right)^T.
+\end{equation}
+Since there is nothing special about the $N\textsuperscript{th}$ layer of the network, the derivations for another layer $n$ would have resulted in an identical equation, simply switching $N$ for $n$, given that all layers simply receive an input, perform a matrix multiplication and then an activation. Thus, \cref{eq:dL/dWN_v2} can be rewritten as
+\begin{equation}
+    \label{eq:dL/dWn}
+    \pd\frac{\partial L}{\partial W^n} = \left(\frac{\partial L}{\partial \mathbf{g}^n}\right)^T\left(\mathbf{h}^{n-1}\right)^T.
+\end{equation}
+Similarly, \cref{eq:dL/dgN} can be rewritten as
+\begin{equation}
+    \label{eq:dL/dgn}
+    \frac{\partial L}{\partial \mathbf{g}^n} = \frac{\partial L}{\partial \mathbf{h}^n}\odot{\sigma^n}^{\prime}\left(\mathbf{g}^n\right)
+\end{equation}
+and \cref{eq:dL/dhNm1} can be rewritten as
+\begin{equation}
+    \label{eq:dL/dhnm1}
+    \pd\frac{\partial L}{\partial \mathbf{h}^{n-1}} = \frac{\partial L}{\partial \mathbf{g}^n}W^n.
+\end{equation}
+
+\vspace{1em}
+With \cref{eq:dL/dWn,eq:dL/dgn,eq:dL/dhnm1}, the rate of change of the loss w.r.t. the rate of change of every single one of the parameters of the neural network can be computed, thus allowing each matrix $W^n$ to be updated via
+\begin{equation}
+    W^n_{t+1} = W^n_t - \eta\frac{\partial L}{\partial W^n_t}
+\end{equation}
+where $\eta$ is the learning rate and $t$ is a given training iteration. The negative sign arises because $\frac{\partial L}{\partial W^n_t}$ gives the ``direction of steepest ascent'' in weight-space, i.e., the direction within $(D_n \times D_{n-1})$-dimensional hyperspace in which the loss increases most rapidly for an infinitesimally small step in this space. Therefore, the weights must be adjusted in order to move in the opposite direction to the steepest ascent, i.e., to take a step in the direction of steepest descent, which is the direction in which an infinitesimally small step in weight-space produces the largest decrease in the loss.
+
+\vspace{1em}
+All of the derivations of backpropagation in this document started with the definition of the loss being $L = \left|\mathbf{y} - \mathbf{f}\right|^2$, i.e., squared loss. However, as you'll have noticed, \cref{eq:dL/dWn,eq:dL/dgn,eq:dL/dhnm1} are expressed completely generally, and can, thus, be used for a neural network with any loss function. Therefore, the only equations that would have to be redefined are those pertaining to the last layer of the network, particularly $\frac{\partial L}{\partial \mathbf{f}}$. If any other transformations are performed between the final matrix multiplication and the calculation of the loss, then these would also have to be treated. Nonetheless, the equations derived in this document provide a comprehensive means of updating all the parameters of a neural network via backpropagation.
+
+\end{document}

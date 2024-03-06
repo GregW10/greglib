@@ -73,7 +73,7 @@ int main() {
     vec = mat;
     std::cout << vec << std::endl;
     std::cout << mat.at(1, 0) << std::endl;
-    std::cout << vec.at(1, 0) << std::endl;
+    std::cout << vec.at(1, 0) << std::endl;/* */
     gml::vector<long double> cvec = {{4},
                                      {3},
                                      {9},
@@ -81,8 +81,13 @@ int main() {
                                      {7},
                                      {2},
                                      {1}};
-    std::cout << "Column vector:\n" << cvec << std::endl;
-    std::cout << "dotted: " << gml::dot(vec, vec2) << std::endl;
+    std::cout << "cvec:\n" << cvec << std::endl;
+    std::cout << "cvec.copy().transpose():\n" << cvec.copy().transpose() << std::endl;
+    std::cout << "cvec:\n" << cvec << std::endl;
+    std::cout << "cvec.transpose():\n" << cvec.transpose() << std::endl;
+    std::cout << "cvec:\n" << cvec << std::endl;
+    std::cout << "cvec.copy().transpose():\n" << cvec.copy().transpose() << "\niscv: " << std::boolalpha << cvec.copy().transpose().is_colvec() << std::endl;
+    std::cout << "cvec:\n" << cvec << std::endl;
     B<int> b;
     // std::cout << b.get(2, 3) << std::endl;
     b.print(4);

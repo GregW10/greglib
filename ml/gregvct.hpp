@@ -13,6 +13,8 @@ namespace gml {
     protected:
         vector_base() = default; // protected as it only serves to delay construction in derived classes
     public:
+        vector_base(const vector_base<T> &other) : matrix<T>{other} {}
+        vector_base(vector_base<T> &&other) : matrix<T>{std::move(other)} {}
         mulComT<T, T> mag_sq() const noexcept { // squared magnitude of the vector
             mulComT<T, T> _tot{};
             T *ptr = matrix<T>::data;
@@ -151,44 +153,6 @@ namespace gml {
             }
             vector_base<T>::_shape._r = 2;
         }
-        /* vector(const std::initializer_list<T> &values) : _cv{false} { // constructor for row vectors only
-            typename std::initializer_list<T>::size_type _size;
-            if (!(_size = values.size())) {
-                init_empty();
-                return;
-            }
-            vector_base<T>::_shape._r = 2;
-            vector_base<T>::_shape._s = new uint64_t[2]{1, _size};
-            vector_base<T>::_shape.sizes = new uint64_t[1]{_size}; // `_size` elements per row (but just 1 row)
-            // vector_base<T>::_shape.calc_sizes();
-            vector_base<T>::vol = _size;
-            vector_base<T>::data = new T[_size];
-            gen::memcopy(vector_base<T>::data, values.begin(), sizeof(T), _size);
-        }
-        vector(const std::initializer_list<std::initializer_list<T>> &values) { // constructor for column vectors only
-            typename std::initializer_list<std::initializer_list<T>>::size_type _size;
-            if (!(_size = values.size())) {
-                init_empty();
-                return;
-            }
-            typename std::initializer_list<T> *lptr = values.begin();
-            typename std::initializer_list<std::initializer_list<T>>::size_type counter = 0;
-            vector_base<T>::data = new T[_size];
-            T *dptr = vector_base<T>::data;
-            while (counter++ < _size) {
-                if (lptr->size() != 1) {
-                    delete [] vector_base<T>::data;
-                    throw exceptions::dimension_mismatch_error{"Error: all rows of a column vector must have 1 "
-                                                               "element.\n"};
-                }
-                *dptr++ = *lptr++->begin();
-            }
-            vector_base<T>::_shape._r = 2;
-            vector_base<T>::_shape._s = new uint64_t[2]{_size, 1};
-            vector_base<T>::_shape.sizes = new uint64_t[1]{1}; // one element per row
-            vector_base<T>::vol = _size;
-            // gen::memcopy(vector_base<T>::data, values.begin(), sizeof(T), _size);
-        } */
         vector(const T *_data, uint64_t _size, bool is_col_vec = true) : _cv{is_col_vec} {
             if (!_data) {
                 if (_size)
@@ -212,8 +176,8 @@ namespace gml {
             vector_base<T>::data = new T[_size];
             gen::memcopy(vector_base<T>::data, _data, sizeof(T), _size);
         }
-        vector(const vector<T> &other) : matrix<T>{other} {}
-        vector(vector<T> &&other) noexcept : matrix<T>{std::move(other)} {}
+        vector(const vector<T> &other) : vector_base<T>{other}, _cv{other._cv} {}
+        vector(vector<T> &&other) noexcept : vector_base<T>{std::move(other)}, _cv{other._cv} {}
         vector &transpose() noexcept /* override */ { // `override` is commented until I write the method in `matrix<T>`
             if (_cv) {
                 *vector_base<T>::_shape._s = 1;
@@ -230,7 +194,11 @@ namespace gml {
         vector &reshape(const tensor_shape &new_shape) override {
             if (new_shape._r != 2)
                 throw std::invalid_argument{"Error: a vector must have a rank of 2.\n"};
-            if (*new_shape._s != 1 && *(new_shape._s + 1) != 1)
+            if (*(new_shape._s + 1) == 1)
+                _cv = true;
+            else if (*new_shape._s == 1) // `else if` because column vectors are favoured
+                _cv = false;
+            else
                 throw exceptions::dimension_mismatch_error{"Error: a vector must have a shape of either "
                                                            "(N,1) or (1,N).\n"};
             /* if constexpr (isColVec) {
@@ -242,7 +210,16 @@ namespace gml {
             } */
             return dynamic_cast<vector<T>&>(tensor<T>::reshape(new_shape));
         }
-        using matrix<T>::at;
+        vector<T> copy() const { // again, can't do anything about the method hiding :(
+            return {*this};
+        }
+        bool is_colvec() const noexcept {
+            return _cv;
+        }
+        bool is_rowvec() const noexcept {
+            return !_cv;
+        }
+        using matrix<T>::at; // again, as in `gregmtx.hpp`, have to bring `at` methods into scope due to name hiding
         T &at(const std::initializer_list<uint64_t> &indices) override {
 #define AT_NC \
             typename std::initializer_list<uint64_t>::size_type _size = indices.size(); \
@@ -364,9 +341,11 @@ namespace gml {
             return *this;
         }
         vector &operator=(const vector<T> &other) {
+            _cv = other._cv;
             return dynamic_cast<vector<T>&>(matrix<T>::operator=(other));
         }
         vector &operator=(vector<T> &&other) {
+            _cv = other._cv;
             return dynamic_cast<vector<T>&>(matrix<T>::operator=(std::move(other)));
         }
         vector &operator=(const matrix<T> &other) { /*
@@ -382,7 +361,11 @@ namespace gml {
             }
             // EX_MAT_EQ("matrix") */
 #define EX_MAT_EQ(text) \
-            if (*other._shape._s != 1 && *(other._shape._s + 1) != 1) \
+            if (*(other._shape._s + 1) == 1) \
+                _cv = true; \
+            else if (*other._shape._s == 1) \
+                _cv = false; \
+            else \
                 throw exceptions::dimension_mismatch_error{"Error: for a " text " to be assigned to a vector, at least"\
                                                            " one of its dimensions must be 1.\n"};
             return dynamic_cast<vector<T>&>(matrix<T>::operator=(other));
@@ -406,12 +389,18 @@ namespace gml {
             return dynamic_cast<vector<T>&>(tensor<T>::operator=(std::move(other)));
         }
 #undef EX_MAT_EQ
-        /* template <Numeric U, Numeric V>
-        friend vector<mulComT<U, V>> operator*(const matrix<U> &mat, const vector<V> &vec) {
+        template <Numeric U, Numeric V>
+        friend vector<mulComT<U, V>> matcvecmul(const matrix<U> &mat, const vector<V> &vec) {
+            /* This function provides dedicated multiplication between an `N x M` matrix and an `M x 1` vector. I could
+             * not define this as another `operator*` overload because of the exception I have to throw if `vec` is a
+             * row vector, which would make any multiplication between an `N x 1` matrix and `1 x M` vector impossible,
+             * since that would require returning a `matrix<T>` with shape `N x M`, and C++ is statically typed. */
+            if (!vec._cv)
+                throw exceptions::matmul_error{"Error: column vector expected.\n"};
             if (*(mat._shape._s + 1) != *vec._shape._s)
                 throw exceptions::dimension_mismatch_error{"Error: number of columns in matrix does not match "
                                                            "dimensionality of vector.\n"};
-            uint64_t _n = *mat._shape._s; // new dimensionality of vector
+            uint64_t _n = *mat._shape._s; // dimensionality of new vector
             if (!_n)
                 return {}; // return empty vector if multiplying by empty matrix
             uint64_t _i = _n;
@@ -429,9 +418,11 @@ namespace gml {
             }
             uint64_t *nshape = new uint64_t[2]{_n, 1};
             return {ndata, 2, nshape, _n, false};
-        } */
-        template <Numeric U>
+        }
+        template <Numeric>
         friend class vector;
+        template <Numeric>
+        friend class ffnn;
     };
 }
 #endif

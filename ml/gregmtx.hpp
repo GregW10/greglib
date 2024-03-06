@@ -151,7 +151,7 @@ namespace gml {
             // be aware that this results in an extra redundant boolean check:
             return dynamic_cast<matrix<T>&>(tensor<T>::reshape(new_shape));
         }
-        using tensor<T>::at;
+        using tensor<T>::at; // have to bring the `at` methods into scope due to name hiding
         T &at(const std::initializer_list<uint64_t> &indices) override {
             if (indices.size() != 2)
                 throw exceptions::indexing_dimension_error{"Error: exactly two indices must be given to index a "
@@ -163,6 +163,9 @@ namespace gml {
                 throw exceptions::indexing_dimension_error{"Error: exactly two indices must be given to index a "
                                                            "matrix.\n"};
             return *(tensor<T>::data + (*indices.begin())*(*(tensor<T>::_shape._s + 1)) + *(indices.end() - 1));
+        }
+        matrix<T> copy() const { // nothing doing with the method hiding :(
+            return {*this};
         }
         std::ofstream::pos_type to_mtsr(const char *path) {
             if (!path || !*path)
@@ -243,6 +246,8 @@ namespace gml {
         friend class matrix;
         template <Numeric>
         friend class vector;
+        template <Numeric>
+        friend class ffnn;
     };
 }
 #endif
