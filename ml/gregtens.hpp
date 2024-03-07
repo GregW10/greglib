@@ -78,6 +78,10 @@ namespace gml {
     }
     template <Numeric T>
     class tensor;
+    namespace tens_ops {
+        template <Numeric U, Numeric V>
+        tensor<mulComT<U, V>> hadamard(const tensor<U>&, const tensor<V>&);
+    }
     class tensor_shape {
         /* Class whose instances describe the shape of a given tensor. I chose to not make it a nested class inside
          * `tensor<T>`, as it should not and does not need to be templated.
@@ -305,6 +309,8 @@ namespace gml {
         friend bool operator!=(const tensor_shape&, const tensor_shape&);
         template <Numeric U>
         friend std::ostream &operator<<(std::ostream&, const tensor<U>&);
+        template <Numeric>
+        friend class ffnn;
     };
     std::ostream &operator<<(std::ostream &out, const tensor_shape &_shape) {
         if (_shape._r == -1)
@@ -483,6 +489,7 @@ namespace gml {
                 throw exceptions::invalid_tsr_format{"Invalid .tsr format: invalid header.\n"};
             load_tsr(in, buff.st_size);
         }
+    protected:
         // ctor ONLY to be used within other methods that will manually initialise the shape object:
         // explicit tensor(bool alloc) : data{}, vol{0}, _shape(alloc) {}
         tensor(T *_data, int64_t rank, uint64_t *_s, bool copy_shape = true) :
@@ -599,14 +606,14 @@ namespace gml {
         const tensor_shape &shape() const noexcept {
             return this->_shape;
         }
-        tensor &for_each(void (*func)(const T&)) {
+        tensor &for_each(void (*func)(T&)) {
             uint64_t counter = this->vol;
             T *ptr = this->data;
             while (counter --> 0)
                 func(*ptr++);
             return *this;
         }
-        tensor &for_each(void (*func)(T)) {
+        tensor &for_each(T (*func)(T)) {
             uint64_t counter = this->vol;
             T *ptr = this->data;
             while (counter --> 0) {
@@ -703,6 +710,26 @@ namespace gml {
         ~tensor() {
             delete [] data;
         }
+        virtual tensor<T> &operator+=(const tensor<T> &other) {
+            if (other._shape != this->_shape)
+                throw exceptions::dimension_mismatch_error{"Error: cannot sum two tensors with different shapes.\n"};
+            T *dptr = this->data;
+            T *optr = other.data;
+            uint64_t counter = this->vol;
+            while (counter --> 0)
+                *dptr++ += *optr++;
+            return *this;
+        }
+        virtual tensor<T> &operator-=(const tensor<T> &other) {
+            if (other._shape != this->_shape)
+                throw exceptions::dimension_mismatch_error{"Error: cannot subtract tensor with different shape.\n"};
+            T *dptr = this->data;
+            T *optr = other.data;
+            uint64_t counter = this->vol;
+            while (counter --> 0)
+                *dptr++ -= *optr++;
+            return *this;
+        }
         template <Numeric U, Numeric V>
         friend tensor<addComT<U, V>> operator+(const tensor<U> &t1, const tensor<V> &t2) {
             if (t1._shape != t2._shape)
@@ -759,6 +786,8 @@ namespace gml {
                 *nptr++ = (*vptr++)/scalar;
             return {_ndata, tens._shape._r, tens._shape._s, tens.vol, true};
         }
+        template <Numeric U, Numeric V>
+        friend tensor<mulComT<U, V>> tens_ops::hadamard(const tensor<U>&, const tensor<V>&);
         template <Numeric U>
         friend std::ostream &operator<<(std::ostream&, const tensor<U>&);
         template <Numeric U, Numeric V>
@@ -811,6 +840,24 @@ namespace gml {
     template <Numeric U, Numeric V>
     bool operator!=(const tensor<U> &t1, const tensor<V> &t2) {
         return !operator==(t1, t2);
+    }
+    namespace tens_ops {
+        template <Numeric U, Numeric V>
+        tensor<mulComT<U, V>> hadamard(const tensor<U> &t1, const tensor<V> &t2) {
+            if (t1._shape != t2._shape)
+                throw exceptions::dimension_mismatch_error{"Error: the Hadamard product can only be performed between "
+                                                           "two tensors of equal shapes.\n"};
+            if (t1._shape._r == -1) // case for hadamard product between two empty tensors
+                return {}; // return empty tensor
+            mulComT<U, V> *_ndata = new mulComT<U, V>[t1.vol];
+            uint64_t counter = t1.vol;
+            mulComT<U, V> *nptr = _ndata;
+            U *d1 = t1.data;
+            V *d2 = t2.data;
+            while (counter --> 0)
+                *nptr++ = (*d1++)*(*d2++);
+            return {_ndata, t1._shape._r, t1._shape._s, t1.vol, true};
+        }
     }
     typedef tensor<long double> tens_ld;
     typedef tensor<double> tens_d;

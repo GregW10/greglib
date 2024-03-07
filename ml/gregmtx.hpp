@@ -91,6 +91,7 @@ namespace gml {
             else
                 throw exceptions::invalid_tsr_format{"Error: invalid .tsr format (invalid header).\n"};
         }
+    protected:
         matrix(T *_data, int64_t rank, uint64_t *_s, bool copy_shape = true) :
         tensor<T>{_data, rank, _s, copy_shape} {}
         matrix(T *_data, int64_t rank, uint64_t *_s, uint64_t _volume, bool copy_shape = true) :
@@ -190,20 +191,96 @@ namespace gml {
             return *(tensor<T>::data + _i*(*(tensor<T>::_shape._s + 1)) + _j);
         }
         virtual matrix &operator=(const matrix<T> &other) {
-            return dynamic_cast<matrix<T>&>(tensor<T>::operator=(other));
+            return static_cast<matrix<T>&>(tensor<T>::operator=(other));
         }
         virtual matrix &operator=(matrix<T> &&other) {
-            return dynamic_cast<matrix<T>&>(tensor<T>::operator=(std::move(other)));
+            return static_cast<matrix<T>&>(tensor<T>::operator=(std::move(other)));
         }
         matrix &operator=(const tensor<T> &other) {
             if (other._shape._r != 2)
                 throw exceptions::dimension_mismatch_error{"Error: only 2D tensors can be assigned to matrices.\n"};
-            return dynamic_cast<matrix<T>&>(tensor<T>::operator=(other));
+            return static_cast<matrix<T>&>(tensor<T>::operator=(other));
         }
         matrix &operator=(tensor<T> &&other) {
             if (other._shape._r != 2)
                 throw exceptions::dimension_mismatch_error{"Error: only 2D tensors can be assigned to matrices.\n"};
-            return dynamic_cast<matrix<T>&>(tensor<T>::operator=(std::move(other)));
+            return static_cast<matrix<T>&>(tensor<T>::operator=(std::move(other)));
+        }
+        matrix<T> &operator+=(const tensor<T> &other) override { // can be made more efficient
+            return static_cast<matrix<T>&>(tensor<T>::operator+=(other));
+        }
+        matrix<T> &operator-=(const tensor<T> &other) override {
+            return static_cast<matrix<T>&>(tensor<T>::operator-=(other));
+        }
+        template <Numeric U, Numeric V>
+        friend matrix<addComT<U, V>> operator+(const matrix<U> &mat1, const matrix<V> &mat2) {
+            if (mat1._shape._r == -1) { // would only happen if the matrix has been moved from
+                if (mat2._shape._r != -1)
+                    throw exceptions::empty_tensor_error{"Error: addition between an empty and a non-empty tensor "
+                                                         "cannot be performed.\n"};
+                return {};
+            }
+            if (mat2._shape._r == -1)
+                throw exceptions::empty_tensor_error{"Error: addition between an empty and a non-empty tensor "
+                                                     "cannot be performed.\n"};
+            if (*mat1._shape._s != *mat2._shape._s || *(mat1._shape._s + 1) != *(mat2._shape._s + 1))
+                throw exceptions::dimension_mismatch_error{"Error: addition between matrices can only be performed "
+                                                           "between matrices of equal shapes.\n"};
+            addComT<U, V> *_ndata = new addComT<U, V>[mat1.vol];
+            uint64_t counter = mat1.vol;
+            addComT<U, V> *nptr = _ndata;
+            U *d1 = mat1.data;
+            V *d2 = mat2.data;
+            while (counter --> 0)
+                *nptr++ = *d1++ + *d2++;
+            return {_ndata, mat1._shape._r, mat1._shape._s, mat1.vol, true}; // let ctor make a copy of the shape array
+        }
+        template <Numeric U, Numeric V>
+        friend matrix<subComT<U, V>> operator-(const matrix<U> &mat1, const matrix<V> &mat2) {
+            if (mat1._shape._r == -1) {
+                if (mat2._shape._r != -1)
+                    throw exceptions::empty_tensor_error{"Error: addition between an empty and a non-empty tensor "
+                                                         "cannot be performed.\n"};
+                return {};
+            }
+            if (mat2._shape._r == -1)
+                throw exceptions::empty_tensor_error{"Error: addition between an empty and a non-empty tensor "
+                                                     "cannot be performed.\n"};
+            if (*mat1._shape._s != *mat2._shape._s || *(mat1._shape._s + 1) != *(mat2._shape._s + 1))
+                throw exceptions::dimension_mismatch_error{"Error: subtraction between matrices can only be performed "
+                                                           "between matrices of equal shapes.\n"};
+            subComT<U, V> *_ndata = new subComT<U, V>[mat1.vol];
+            uint64_t counter = mat1.vol;
+            subComT<U, V> *nptr = _ndata;
+            U *d1 = mat1.data;
+            V *d2 = mat2.data;
+            while (counter --> 0)
+                *nptr++ = *d1++ - *d2++;
+            return {_ndata, mat1._shape._r, mat1._shape._s, mat1.vol, true};
+        }
+        template <Numeric U, Numeric V>
+        friend matrix<mulComT<U, V>> operator*(const U &scalar, const matrix<V> &mat) {
+            if (mat._shape._r == -1)
+                return {};
+            mulComT<U, V> *_ndata = new mulComT<U, V>[mat.vol];
+            uint64_t counter = mat.vol;
+            mulComT<U, V> *nptr = _ndata;
+            V *vptr = mat.data;
+            while (counter --> 0)
+                *nptr++ = scalar*(*vptr++);
+            return {_ndata, mat._shape._r, mat._shape._s, mat.vol, true};
+        }
+        template <Numeric U, Numeric V>
+        friend matrix<divComT<U, V>> operator/(const matrix<U> &mat, const V &scalar) {
+            if (mat._shape._r == -1)
+                return {};
+            divComT<U, V> *_ndata = new divComT<U, V>[mat.vol];
+            uint64_t counter = mat.vol;
+            divComT<U, V> *nptr = _ndata;
+            U *vptr = mat.data;
+            while (counter --> 0)
+                *nptr++ = (*vptr++)/scalar;
+            return {_ndata, mat._shape._r, mat._shape._s, mat.vol, true};
         }
         template <Numeric U, Numeric V>
         friend matrix<mulComT<U, V>> operator*(const matrix<U> &m1, const matrix<V> &m2) {
@@ -242,6 +319,8 @@ namespace gml {
             *(nshape + 1) = _m;
             return {pdata, m1._shape._r, nshape, _volume, false}; // ctor WON'T make a copy of shape array
         }
+        template <Numeric U, Numeric V>
+        friend matrix<mulComT<U, V>> tens_ops::hadamard(const matrix<U>&, const matrix<V>&);
         template <Numeric>
         friend class matrix;
         template <Numeric>
@@ -249,5 +328,30 @@ namespace gml {
         template <Numeric>
         friend class ffnn;
     };
+    namespace tens_ops {
+        template <Numeric U, Numeric V>
+        matrix<mulComT<U, V>> hadamard(const matrix<U> &mat1, const matrix<V> &mat2) {
+            if (mat1._shape._r == -1) {
+                if (mat2._shape._r != -1)
+                    throw exceptions::empty_tensor_error{"Error: addition between an empty and a non-empty tensor "
+                                                         "cannot be performed.\n"};
+                return {};
+            }
+            if (mat2._shape._r == -1)
+                throw exceptions::empty_tensor_error{"Error: addition between an empty and a non-empty tensor "
+                                                     "cannot be performed.\n"};
+            if (*mat1._shape._s != *mat2._shape._s || *(mat1._shape._s + 1) != *(mat2._shape._s + 1))
+                throw exceptions::dimension_mismatch_error{"Error: the Hadamard product can only be performed between "
+                                                           "two matrices of equal shapes.\n"};
+            mulComT<U, V> *_ndata = new mulComT<U, V>[mat1.vol];
+            uint64_t counter = mat1.vol;
+            mulComT<U, V> *nptr = _ndata;
+            U *d1 = mat1.data;
+            V *d2 = mat2.data;
+            while (counter --> 0)
+                *nptr++ = (*d1++)*(*d2++);
+            return {_ndata, mat1._shape._r, mat1._shape._s, mat1.vol, true};
+        }
+    }
 }
 #endif

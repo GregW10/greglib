@@ -6,11 +6,11 @@
 namespace gml {
     template <Numeric T>
     class vector_base : public matrix<T> { // abstract base class for vectors
+    protected:
         vector_base(T *_data, int64_t rank, uint64_t *_s, bool copy_shape = true) :
         matrix<T>{_data, rank, _s, copy_shape} {}
         vector_base(T *_data, int64_t rank, uint64_t *_s, uint64_t _volume, bool copy_shape = true) :
         matrix<T>{_data, rank, _s, _volume, copy_shape} {}
-    protected:
         vector_base() = default; // protected as it only serves to delay construction in derived classes
     public:
         vector_base(const vector_base<T> &other) : matrix<T>{other} {}
@@ -69,7 +69,7 @@ namespace gml {
         return _dot;
     }
     template <Numeric T>
-    class vector : virtual public vector_base<T> {
+    class vector : public vector_base<T> {
         bool _cv = true; // boolean indicating whether the vector is a column vector or not
         // having the above boolean is not 100% necessary, as the property can be checked, but for a given `vector<T>`
         // object, it can only be changed through the `transpose` method, so having a boolean avoids constant checking
@@ -87,12 +87,15 @@ namespace gml {
             vector_base<T>::vol = 0;
             vector_base<T>::data = new T[0];
         }
-        vector(T *_data, int64_t rank, uint64_t *_s, bool copy_shape = true) :
-        vector_base<T>{_data, rank, _s, copy_shape} {}
-        vector(T *_data, int64_t rank, uint64_t *_s, uint64_t _volume, bool copy_shape = true) :
-        vector_base<T>{_data, rank, _s, _volume, copy_shape} {}
+        vector(T *_data, int64_t rank, uint64_t *_s, bool copy_shape = true, bool is_col_vec = true) :
+        vector_base<T>{_data, rank, _s, copy_shape}, _cv{is_col_vec} {}
+        vector(T *_data, int64_t rank, uint64_t *_s, uint64_t _volume, bool copy_shape = true, bool is_col_vec = true) :
+        vector_base<T>{_data, rank, _s, _volume, copy_shape}, _cv{is_col_vec} {}
     public:
-        explicit vector(bool is_col_vec = true) : _cv{is_col_vec} {
+        vector() {
+            init_empty();
+        }
+        explicit vector(bool is_col_vec) : _cv{is_col_vec} {
             init_empty();
         }
         explicit vector(uint64_t _dim, bool is_col_vec = true) : _cv{is_col_vec} { // creates a vector full of zeros
@@ -263,7 +266,7 @@ namespace gml {
 #undef OP_NC
     private:
         template <Numeric U> requires (std::is_convertible_v<mulComT<T, U>, T>)
-        void apply_cv(const matrix<U> &mat) {
+        vector<T> &apply_cv(const matrix<U> &mat) {
             /* This method transforms the vector according to the transformation encoded by `mat`. This would be the
              * equivalent of multiplying `mat*(*this)` and then reassigning the result to `*this`. */
             if (*(mat._shape._s + 1) != matrix<T>::vol)
@@ -274,7 +277,7 @@ namespace gml {
                 matrix<T>::vol = 0;
                 delete [] matrix<T>::data;
                 matrix<T>::data = new T[0];
-                return;
+                return *this;
             }
             T *ndata = new T[*mat._shape._s]; // need to allocate, even if vector doesn't change size
             uint64_t _i = *mat._shape._s; // new dimensionality of vector
@@ -293,9 +296,10 @@ namespace gml {
             matrix<T>::vol = *mat._shape._s;
             delete [] matrix<T>::data;
             matrix<T>::data = ndata;
+            return *this;
         }
         template <Numeric U> requires (std::is_convertible_v<mulComT<T, U>, T>)
-        void apply_rv(const matrix<U> &mat) {
+        vector<T> &apply_rv(const matrix<U> &mat) {
             /* This overload of `apply` is the equivalent of the above, but for row vectors. It is the equivalent of
              * multiplying `(*this)*mat` and then reassigning the result to `*this`. */
             if (*mat._shape._s != matrix<T>::vol)
@@ -307,7 +311,7 @@ namespace gml {
                 matrix<T>::vol = 0;
                 delete [] matrix<T>::data;
                 matrix<T>::data = new T[0];
-                return;
+                return *this;
             }
             T *ndata = new T[_m]{}; // need to allocate, even if vector doesn't change size
             uint64_t _i = _m; // new dimensionality of vector
@@ -330,23 +334,22 @@ namespace gml {
             matrix<T>::vol = _m;
             delete [] matrix<T>::data;
             matrix<T>::data = ndata;
+            return *this;
         }
     public:
         template <Numeric U> requires (std::is_convertible_v<mulComT<T, U>, T>)
         vector &apply(const matrix<U> &mat) {
             if (_cv)
-                this->apply_cv(mat);
-            else
-                this->apply_rv(mat);
-            return *this;
+                return this->apply_cv(mat);
+            return this->apply_rv(mat);
         }
         vector &operator=(const vector<T> &other) {
             _cv = other._cv;
-            return dynamic_cast<vector<T>&>(matrix<T>::operator=(other));
+            return static_cast<vector<T>&>(matrix<T>::operator=(other));
         }
         vector &operator=(vector<T> &&other) {
             _cv = other._cv;
-            return dynamic_cast<vector<T>&>(matrix<T>::operator=(std::move(other)));
+            return static_cast<vector<T>&>(matrix<T>::operator=(std::move(other)));
         }
         vector &operator=(const matrix<T> &other) { /*
 #define EX_MAT_EQ(text) \
@@ -368,25 +371,88 @@ namespace gml {
             else \
                 throw exceptions::dimension_mismatch_error{"Error: for a " text " to be assigned to a vector, at least"\
                                                            " one of its dimensions must be 1.\n"};
-            return dynamic_cast<vector<T>&>(matrix<T>::operator=(other));
+            return static_cast<vector<T>&>(matrix<T>::operator=(other));
         }
         vector &operator=(matrix<T> &&other) {
             EX_MAT_EQ("matrix")
-            return dynamic_cast<vector<T>&>(matrix<T>::operator=(std::move(other)));
+            return static_cast<vector<T>&>(matrix<T>::operator=(std::move(other)));
         }
         vector &operator=(const tensor<T> &other) {
             if (other._shape._r != 2)
                 throw exceptions::dimension_mismatch_error{"Error: a tensor of rank greater than 2 cannot be assigned "
                                                            "to a vector.\n"};
             EX_MAT_EQ("2D tensor")
-            return dynamic_cast<vector<T>&>(tensor<T>::operator=(other));
+            return static_cast<vector<T>&>(tensor<T>::operator=(other));
         }
         vector &operator=(tensor<T> &&other) {
             if (other._shape._r != 2)
                 throw exceptions::dimension_mismatch_error{"Error: a tensor of rank greater than 2 cannot be assigned "
                                                            "to a vector.\n"};
             EX_MAT_EQ("2D tensor")
-            return dynamic_cast<vector<T>&>(tensor<T>::operator=(std::move(other)));
+            return static_cast<vector<T>&>(tensor<T>::operator=(std::move(other)));
+        }
+        vector<T> &operator+=(const tensor<T> &other) override {
+            return static_cast<vector<T>&>(tensor<T>::operator+=(other));
+        }
+        vector<T> &operator-=(const tensor<T> &other) override {
+            return static_cast<vector<T>&>(tensor<T>::operator-=(other));
+        }
+        template <Numeric U, Numeric V>
+        friend vector<addComT<U, V>> operator+(const vector<U> &vec1, const vector<V> &vec2) {
+            if (vec1._cv != vec2._cv || vec1.vol != vec2.vol)
+                throw exceptions::dimension_mismatch_error{"Error: addition between vectors can only be performed "
+                                                           "between vectors of equal shapes.\n"};
+            if (vec1._shape._r == -1) // would only happen if vector has been moved from
+                return {};
+            addComT<U, V> *_ndata = new addComT<U, V>[vec1.vol];
+            uint64_t counter = vec1.vol;
+            addComT<U, V> *nptr = _ndata;
+            U *d1 = vec1.data;
+            V *d2 = vec2.data;
+            while (counter --> 0)
+                *nptr++ = *d1++ + *d2++;
+            return {_ndata, vec1._shape._r, vec1._shape._s, vec1.vol, true}; // let ctor make a copy of the shape array
+        }
+        template <Numeric U, Numeric V>
+        friend vector<subComT<U, V>> operator-(const vector<U> &vec1, const vector<V> &vec2) {
+            std::cout << std::boolalpha << vec1._cv << ", " << vec2._cv << ", " << vec1.vol << ", " << vec2.vol << std::endl;
+            if (vec1._cv != vec2._cv || vec1.vol != vec2.vol)
+                throw exceptions::dimension_mismatch_error{"Error: subtraction between vectors can only be performed "
+                                                           "between vectors of equal shapes.\n"};
+            if (vec1._shape._r == -1)
+                return {};
+            subComT<U, V> *_ndata = new subComT<U, V>[vec1.vol];
+            uint64_t counter = vec1.vol;
+            subComT<U, V> *nptr = _ndata;
+            U *d1 = vec1.data;
+            V *d2 = vec2.data;
+            while (counter --> 0)
+                *nptr++ = *d1++ - *d2++;
+            return {_ndata, vec1._shape._r, vec1._shape._s, vec1.vol, true};
+        }
+        template <Numeric U, Numeric V>
+        friend vector<mulComT<U, V>> operator*(const U &scalar, const vector<V> &vec) {
+            if (vec._shape._r == -1)
+                return {};
+            mulComT<U, V> *_ndata = new mulComT<U, V>[vec.vol];
+            uint64_t counter = vec.vol;
+            mulComT<U, V> *nptr = _ndata;
+            V *vptr = vec.data;
+            while (counter --> 0)
+                *nptr++ = scalar*(*vptr++);
+            return {_ndata, vec._shape._r, vec._shape._s, vec.vol, true};
+        }
+        template <Numeric U, Numeric V>
+        friend vector<divComT<U, V>> operator/(const vector<U> &vec, const V &scalar) {
+            if (vec._shape._r == -1)
+                return {};
+            divComT<U, V> *_ndata = new divComT<U, V>[vec.vol];
+            uint64_t counter = vec.vol;
+            divComT<U, V> *nptr = _ndata;
+            U *vptr = vec.data;
+            while (counter --> 0)
+                *nptr++ = (*vptr++)/scalar;
+            return {_ndata, vec._shape._r, vec._shape._s, vec.vol, true};
         }
 #undef EX_MAT_EQ
         template <Numeric U, Numeric V>
@@ -419,10 +485,30 @@ namespace gml {
             uint64_t *nshape = new uint64_t[2]{_n, 1};
             return {ndata, 2, nshape, _n, false};
         }
+        template <Numeric U, Numeric V>
+        friend vector<mulComT<U, V>> tens_ops::hadamard(const vector<U>&, const vector<V>&);
         template <Numeric>
         friend class vector;
         template <Numeric>
         friend class ffnn;
     };
+    namespace tens_ops {
+        template <Numeric U, Numeric V>
+        vector<mulComT<U, V>> hadamard(const vector<U> &vec1, const vector<V> &vec2) {
+            if (vec1._cv != vec2._cv || vec1.vol != vec2.vol)
+                throw exceptions::dimension_mismatch_error{"Error: the Hadamard product can only be performed between "
+                                                           "two vectors of equal shapes.\n"};
+            if (vec1._shape._r == -1) // case for hadamard product between two empty vectors
+                return {}; // return empty vector
+            mulComT<U, V> *_ndata = new mulComT<U, V>[vec1.vol];
+            uint64_t counter = vec1.vol;
+            mulComT<U, V> *nptr = _ndata;
+            U *d1 = vec1.data;
+            V *d2 = vec2.data;
+            while (counter --> 0)
+                *nptr++ = (*d1++)*(*d2++);
+            return {_ndata, vec1._shape._r, vec1._shape._s, vec1.vol, true, vec1._cv};
+        }
+    }
 }
 #endif
