@@ -415,7 +415,6 @@ namespace gml {
         }
         template <Numeric U, Numeric V>
         friend vector<subComT<U, V>> operator-(const vector<U> &vec1, const vector<V> &vec2) {
-            std::cout << std::boolalpha << vec1._cv << ", " << vec2._cv << ", " << vec1.vol << ", " << vec2.vol << std::endl;
             if (vec1._cv != vec2._cv || vec1.vol != vec2.vol)
                 throw exceptions::dimension_mismatch_error{"Error: subtraction between vectors can only be performed "
                                                            "between vectors of equal shapes.\n"};

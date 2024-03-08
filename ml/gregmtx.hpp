@@ -220,7 +220,7 @@ namespace gml {
                                                          "cannot be performed.\n"};
                 return {};
             }
-            if (mat2._shape._r == -1)
+            else if (mat2._shape._r == -1)
                 throw exceptions::empty_tensor_error{"Error: addition between an empty and a non-empty tensor "
                                                      "cannot be performed.\n"};
             if (*mat1._shape._s != *mat2._shape._s || *(mat1._shape._s + 1) != *(mat2._shape._s + 1))
@@ -243,7 +243,7 @@ namespace gml {
                                                          "cannot be performed.\n"};
                 return {};
             }
-            if (mat2._shape._r == -1)
+            else if (mat2._shape._r == -1)
                 throw exceptions::empty_tensor_error{"Error: addition between an empty and a non-empty tensor "
                                                      "cannot be performed.\n"};
             if (*mat1._shape._s != *mat2._shape._s || *(mat1._shape._s + 1) != *(mat2._shape._s + 1))

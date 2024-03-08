@@ -76,11 +76,21 @@ namespace gml {
             explicit empty_tensor_error(const char *msg) : tensor_error{msg} {}
         };
     }
-    template <Numeric T>
+    template <Numeric>
     class tensor;
+    template <Numeric>
+    class matrix;
+    template <Numeric>
+    class vector_base;
+    template <Numeric>
+    class vector;
     namespace tens_ops {
         template <Numeric U, Numeric V>
         tensor<mulComT<U, V>> hadamard(const tensor<U>&, const tensor<V>&);
+        template <Numeric U, Numeric V>
+        matrix<mulComT<U, V>> hadamard(const matrix<U>&, const matrix<V>&);
+        template <Numeric U, Numeric V>
+        vector<mulComT<U, V>> hadamard(const vector<U>&, const vector<V>&);
     }
     class tensor_shape {
         /* Class whose instances describe the shape of a given tensor. I chose to not make it a nested class inside
@@ -309,6 +319,38 @@ namespace gml {
         friend bool operator!=(const tensor_shape&, const tensor_shape&);
         template <Numeric U>
         friend std::ostream &operator<<(std::ostream&, const tensor<U>&);
+        template <Numeric U, Numeric V>
+        friend tensor<mulComT<U, V>> tens_ops::hadamard(const tensor<U>&, const tensor<V>&);
+        template <Numeric U, Numeric V>
+        friend matrix<mulComT<U, V>> tens_ops::hadamard(const matrix<U>&, const matrix<V>&);
+        template <Numeric U, Numeric V>
+        friend vector<mulComT<U, V>> tens_ops::hadamard(const vector<U>&, const vector<V>&);
+        template <Numeric U, Numeric V>
+        friend tensor<addComT<U, V>> operator+(const tensor<U>&, const tensor<V>&);
+        template <Numeric U, Numeric V>
+        friend tensor<subComT<U, V>> operator-(const tensor<U>&, const tensor<V>&);
+        template <Numeric U, Numeric V>
+        friend tensor<mulComT<U, V>> operator*(const U&, const tensor<V>&);
+        template <Numeric U, Numeric V>
+        friend tensor<divComT<U, V>> operator/(const tensor<U>&, const V&);
+        template <Numeric U, Numeric V>
+        friend matrix<addComT<U, V>> operator+(const matrix<U>&, const matrix<V>&);
+        template <Numeric U, Numeric V>
+        friend matrix<subComT<U, V>> operator-(const matrix<U>&, const matrix<V>&);
+        template <Numeric U, Numeric V>
+        friend matrix<mulComT<U, V>> operator*(const U&, const matrix<V>&);
+        template <Numeric U, Numeric V>
+        friend matrix<divComT<U, V>> operator/(const matrix<U>&, const V&);
+        template <Numeric U, Numeric V>
+        friend vector<addComT<U, V>> operator+(const vector<U>&, const vector<V>&);
+        template <Numeric U, Numeric V>
+        friend vector<subComT<U, V>> operator-(const vector<U>&, const vector<V>&);
+        template <Numeric U, Numeric V>
+        friend vector<mulComT<U, V>> operator*(const U&, const vector<V>&);
+        template <Numeric U, Numeric V>
+        friend vector<divComT<U, V>> operator/(const vector<U>&, const V&);
+        template <Numeric U, Numeric V>
+        friend matrix<mulComT<U, V>> operator*(const matrix<U>&, const matrix<V>&);
         template <Numeric>
         friend class ffnn;
     };
@@ -606,21 +648,25 @@ namespace gml {
         const tensor_shape &shape() const noexcept {
             return this->_shape;
         }
-        tensor &for_each(void (*func)(T&)) {
+        void to_zeros() noexcept { // set all elements to zero
+            uint64_t counter = this->vol;
+            T *ptr = this->data;
+            while (counter --> 0)
+                *ptr++ = 0;
+        }
+        void for_each(void (*func)(T&)) {
             uint64_t counter = this->vol;
             T *ptr = this->data;
             while (counter --> 0)
                 func(*ptr++);
-            return *this;
         }
-        tensor &for_each(T (*func)(T)) {
+        void for_each(T (*func)(T)) {
             uint64_t counter = this->vol;
             T *ptr = this->data;
             while (counter --> 0) {
                 *ptr = func(*ptr);
                 ++ptr;
             }
-            return *this;
         }
         T *begin() noexcept {
             /* If `this->data` is `nullptr` (empty tensor), this operation is still defined. */
