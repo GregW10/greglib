@@ -1,0 +1,6 @@
+Notes for improvements I have to make in my ML frameworks:
+
+- Make new constructors for `gml::tensor<T>`, `gml::matrix<T>` and `gml::vector<T>` that construct them with the given
+  dimensions, but do not default-initialise values, as this is expensive and should only be performed if necessary
+- Add more activation functions
+- Add more loss functions

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <random>
 #include <deque>
+#include <map>
 
 namespace gml {
     namespace exceptions {
@@ -12,6 +13,11 @@ namespace gml {
         public:
             invalid_nn_sequence() :std::logic_error{"Error: invalid sequence of steps in neural network processes.\n"}{}
             explicit invalid_nn_sequence(const char *msg) : std::logic_error{msg} {}
+        };
+        class invalid_nnw_format : public std::logic_error {
+        public:
+            invalid_nnw_format() :std::logic_error{"Error: invalid .nnw file format.\n"} {}
+            explicit invalid_nnw_format(const char *msg) : std::logic_error{msg} {}
         };
     }
     namespace activations {
@@ -37,6 +43,37 @@ namespace gml {
         template <Numeric T>
         void softroot(T &val) {
             val = val/(1 + sqrtl(val < 0 ? -val : val)); // my own invention
+        }
+        template <Numeric T>
+        std::pair<void (*)(T&), void (*)(T&)> get_func_by_id(uint32_t _id) {
+            /* Returns the activation function and its derivative with ID `id`, throws exception if it doesn't exist. */
+            /* An activation function and its derivative are assigned the same ID, as they are always used together. */
+            static const std::map<uint32_t, std::pair<void (*)(T&), void (*)(T&)>> _funcs = {
+                    {0, {nullptr, nullptr}}, // an ID of zero means no activation function
+                    {1, {sigmoid<T>, sigmoid_d<T>}},
+                    {2, {softsign<T>, softsign_d<T>}}
+            };
+            return _funcs.at(_id);
+        }
+        template <Numeric T>
+        std::pair<void (*)(T&), void (*)(T&)> get_id_by_func(void (*_f)(T&)) {
+            /* Returns the ID of activation function `_f`. */
+            static const std::map<void (*)(T&), uint32_t> _funcs = {
+                    {nullptr, 0},
+                    {sigmoid<T>, 1},
+                    {softsign<T>, 2}
+            };
+            return _funcs.at(_f);
+        }
+        template <Numeric T>
+        std::pair<void (*)(T&), void (*)(T&)> get_id_by_dfunc(void (*_f)(T&)) {
+            /* Returns the ID of the activation function derivative `_f`. */
+            static const std::map<void (*)(T&), uint32_t> _funcs = {
+                    {nullptr, 0},
+                    {sigmoid_d<T>, 1},
+                    {softsign_d<T>, 2}
+            };
+            return _funcs.at(_f);
         }
     }
     namespace losses {
@@ -85,7 +122,29 @@ namespace gml {
             void init_glono() { // initialise weights to a normal Glorot distribution
                 // will not implement this until I have derived it myself (from Glorot's paper which gave the above)
             }
+            layer(T *_dataW, int64_t rankW, uint64_t *_sW, uint64_t _volumeW, bool copy_shapeW,
+                  T *_data_b, int64_t rank_b, uint64_t *_s_b, uint64_t _volume_b, bool copy_shape_b,
+                  uint64_t _actfunc_id) :
+            DN{*_sW}, DNm1{*(_sW + 1)}, W{_dataW, rankW, _sW, _volumeW, copy_shapeW},
+            _b{_data_b, rank_b, _s_b, _volume_b, copy_shape_b, true} {
+                try {
+                    auto [f1, f2] = activations::get_func_by_id<T>(_actfunc_id);
+                    _sigma = f1;
+                    _sigmap = f2;
+                } catch(const std::out_of_range&) {/* `_sigma` and `_sigmap` already `nullptr`, no action required */}
+            }
         public:
+#pragma pack(push, 1)
+            struct info_chunk {
+                uint32_t _fid; // activation function ID
+                uint64_t _idim; // input dimension of layer
+                uint64_t _odim; // output dimension of layer
+            };
+            struct layer_chunk {
+                T *_weights;
+                T *_biases;
+            };
+#pragma pack(pop)
             layer(uint64_t _input_dim,
                   uint64_t _output_dim,
                   void (*act_func)(T&) = nullptr,
@@ -264,13 +323,90 @@ namespace gml {
         uint64_t _bsize = 0; // counter for number of forwards/backwards passes performed ( == num. batches)
         bool fpassed = false;
         // bool bpassed = false;
+        void load_nnw(const char *path) {
+            struct stat buff{};
+            if (stat(path, &buff) == -1)
+                throw std::ios_base::failure{"Error: could not obtain .nnw file info.\n"};
+            if (!S_ISREG(buff.st_mode))
+                throw std::ios_base::failure{"Error: .nnw file is not a regular file.\n"};
+            if (buff.st_size < sizeof(nnw_header))
+                throw exceptions::invalid_nnw_format{"Error: invalid .nnw format - insufficient file size.\n"};
+            std::ifstream in{path, std::ios_base::in | std::ios_base::binary};
+            if (!in.good())
+                throw std::ios_base::failure{"Error: could not open .nnw file for reading.\n"};
+            nnw_header _hdr;
+            in.read((char *) &_hdr, sizeof(nnw_header));
+            if (_hdr.hd[0] != 'N' || _hdr.hd[1] != 'N' || _hdr.hd[2] != 'W')
+                throw exceptions::invalid_nnw_format{"Error: invalid .nnw format - invalid file signature.\n"};
+            if (_hdr._sizeof_T != sizeof(T))
+                throw exceptions::invalid_nnw_format{"Error: invalid .nnw format - reported \"sizeof(T)\" does not "
+                                                     "match actual \"sizeof(T)\".\n"};
+            if (!_hdr._numl) {
+                if (buff.st_size > sizeof(nnw_header))
+                    throw exceptions::invalid_nnw_format{"Error: invalid .nnw format - file too large for storing "
+                                                         "network with zero layers.\n"};
+                in.close();
+                return; // an empty .nnw file is a no-op, it is fine
+            }
+            uint64_t _ichunks_size = _hdr._numl*sizeof(ichunk_t); // size of all layer info chunks
+            uint64_t _cum_size = sizeof(nnw_header) + _ichunks_size; // cumulative size
+            if (buff.st_size < _cum_size)
+                throw exceptions::invalid_nnw_format{"Error: invalid .nnw format - file size insufficient for reported "
+                                                     "number of layers.\n"};
+            ichunk_t *_ichunks = new ichunk_t[_hdr._numl];
+            ichunk_t *iptr = _ichunks;
+            in.read((char *) _ichunks, _ichunks_size);
+            uint64_t _num_elems = 0;
+            uint64_t counter = _hdr._numl;
+            while (counter --> 0) {
+                _num_elems += iptr->_odim*iptr->_idim + iptr->_odim;
+                ++iptr;
+            }
+            _cum_size += _num_elems*sizeof(T); // by here, `_cum_size` equals the correct total file size
+            if (buff.st_size != _cum_size)
+                throw exceptions::invalid_nnw_format{"Error: invalid .nnw format - invalid file size.\n"};
+            T *_dataW;
+            T *_data_b;
+            uint64_t _wvol;
+            uint64_t _wshape[2];
+            uint64_t _bshape[2];
+            iptr = _ichunks;
+            counter = _hdr._numl;
+            while (counter --> 0) {
+                _dataW = new T[(_wvol = iptr->_odim*iptr->_idim)];
+                _data_b = new T[iptr->_odim];
+                _wshape[0] = iptr->_odim;
+                _wshape[1] = iptr->_idim;
+                _bshape[0] = iptr->_odim;
+                _bshape[1] = 1;
+                this->layers.emplace_back(_dataW, 2, _wshape, _wvol, true, _data_b, 2, _bshape, iptr->_odim, true,
+                                          iptr->_fid);
+                ++iptr;
+            }
+            delete [] _ichunks;
+            in.close();
+        }
     public:
+        using ichunk_t = layer::info_chunk;
+        using lchunk_t = layer::layer_chunk;
+#pragma pack(push, 1)
+        struct nnw_header {
+            const char hd[3] = {'N', 'N', 'W'};
+            const unsigned char _sizeof_T = sizeof(T);
+            uint64_t _numl{}; // number of layers
+        };
+#pragma pack(pop)
         using deq_size_t = typename std::deque<layer>::size_type;
         ffnn() = default;
         explicit ffnn(std::pair<T, vector<T>> (*loss_function)(const vector<T>&, const vector<T>&)) {
             if (!loss_function)
                 throw std::invalid_argument{"Error: loss function passed cannot be nullptr.\n"};
             _lossf = loss_function;
+        }
+        explicit ffnn(const char *nnw_path) {
+            if (!nnw_path)
+                throw std::invalid_argument{"Error: path to .nnw file cannot be `nullptr`.\n"};
+            this->load_nnw(nnw_path);
         }
         template <typename ...Args>
         const layer &emplace_back(Args&&... args) { // preferred method for adding a layer as it constructs it in place
@@ -307,6 +443,18 @@ namespace gml {
             this->layers.emplace_back(std::move(_layer));
             return this->layers.back();
         } */
+        std::pair<T, vector<T>> (*loss_func())(const vector<T>&, const vector<T>&) {
+            return this->_lossf;
+        }
+        std::pair<T, vector<T>> (*loss_func(std::pair<T, vector<T>> (*_new_lossf)(const vector<T>&, const vector<T>&)))
+                                (const vector<T>&, const vector<T>&) {
+            /* Sets the loss function to `_new_lossf` and returns the previous loss function. */
+            if (!_new_lossf)
+                return nullptr;
+            auto _oldfunc = this->_lossf;
+            this->_lossf = _new_lossf;
+            return _oldfunc;
+        }
         deq_size_t num_layers() const noexcept {
             return this->layers.size();
         }
@@ -376,6 +524,54 @@ namespace gml {
         }
         typename std::deque<layer>::const_iterator end() const {
             return this->layers.end();
+        }
+        uint64_t nnw_fsize() const noexcept {
+            /* Returns the size a .nnw file would need to be to represent the entire network. */
+            uint64_t _tot_params = 0;
+            for (const layer &_layer : this->layers)
+                _tot_params += _layer.wvol + _layer.DN;
+            return 12 + this->layers.size()*sizeof(ichunk_t) + sizeof(T)*_tot_params;
+        }
+        std::ofstream::pos_type to_nnw(const char *path) const {
+            /* Writes the entire network's weights, biases and activation function IDs to a .nnw file. */
+            if (!path)
+                throw std::invalid_argument{"Error: path to .nnw passed cannot be nullptr.\n"};
+            std::ofstream out{path, std::ios_base::out | std::ios_base::binary | std::ios_base::trunc};
+            if (!out.good())
+                throw std::ios_base::failure{"Error: could not open .nnw file.\n"};
+            nnw_header _hdr;
+            _hdr._numl = this->layers.size();
+            out.write((char *) &_hdr, sizeof(nnw_header));
+            if (!_hdr._numl) {
+                std::ofstream::pos_type _pos = out.tellp();
+                out.close();
+                return _pos; // not much point in writing an empty .nnw file, but I don't see any reason to prohibit it
+            }
+            ichunk_t *_ichunks = new ichunk_t[_hdr._numl]; // have chosen to allocate to avoid more I/O calls
+            ichunk_t *iptr = _ichunks;
+            for (const layer &_layer : this->layers) {
+                iptr->_idim = _layer.DNm1;
+                iptr->_odim = _layer.DN;
+                if (!_layer._sigma) {
+                    iptr++->_fid = 0;
+                    continue;
+                }
+                try {
+                    iptr->_fid = activations::get_id_by_func<T>(_layer._sigma);
+                } catch(const std::out_of_range&) {
+                    iptr->_fid = -1; // 4294967295 due to underflow - represents unknown function (not one of mine)
+                }
+                ++iptr;
+            }
+            out.write((char*) _ichunks, _hdr._numl*sizeof(ichunk_t));
+            delete [] _ichunks;
+            for (const layer &_layer : this->layers) { // can't avoid the second loop
+                out.write((char *) _layer.W.data, _layer.wvol*sizeof(T)); // write layer weights
+                out.write((char *) _layer._b.data, _layer.DN*sizeof(T)); // write layer biases
+            }
+            std::ofstream::pos_type _pos = out.tellp();
+            out.close();
+            return _pos;
         }
         const layer &operator[](uint64_t index) const {
             return this->layers[index];
