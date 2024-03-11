@@ -194,7 +194,7 @@ namespace gtd {
         template <typename T>
         T get_arg(const std::string &flag, T (*func)(const char*), const T &def_val,
                   dup_pol duplication_policy = USE_FIRST) { // convenience method
-            char *arg = get_arg(flag, duplication_policy);
+            const char *arg = get_arg(flag, duplication_policy);
             return arg ? func(arg) : def_val;
         }
         const char *get_arg(const std::string &flag, dup_pol duplication_policy = USE_FIRST) {

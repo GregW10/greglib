@@ -46,7 +46,7 @@ namespace gml {
         }
         template <Numeric T>
         std::pair<void (*)(T&), void (*)(T&)> get_func_by_id(uint32_t _id) {
-            /* Returns the activation function and its derivative with ID `id`, throws exception if it doesn't exist. */
+            /* Returns the activation function and its derivative with ID `_id`, throws exception if it doesn't exist.*/
             /* An activation function and its derivative are assigned the same ID, as they are always used together. */
             static const std::map<uint32_t, std::pair<void (*)(T&), void (*)(T&)>> _funcs = {
                     {0, {nullptr, nullptr}}, // an ID of zero means no activation function
@@ -375,6 +375,8 @@ namespace gml {
             while (counter --> 0) {
                 _dataW = new T[(_wvol = iptr->_odim*iptr->_idim)];
                 _data_b = new T[iptr->_odim];
+                in.read((char *) _dataW, _wvol*sizeof(T));
+                in.read((char *) _data_b, iptr->_odim*sizeof(T));
                 _wshape[0] = iptr->_odim;
                 _wshape[1] = iptr->_idim;
                 _bshape[0] = iptr->_odim;
