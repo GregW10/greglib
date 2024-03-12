@@ -580,12 +580,22 @@ namespace gml {
                 return;
             }
             this->data = new T[this->vol];
-            gen::memcopy(this->data, other.data, sizeof(T), other.vol);
+            gen::memcopy(this->data, other.data, sizeof(T), other.vol); // watch out, bypasses constructor of T if non-t
         }
         tensor(tensor<T> &&other) noexcept : _shape{std::move(other._shape)}, vol{other.vol}, data{other.data} {
             // other._shape.make_empty(); // redundant because the move already leaves the other shape empty
             other.vol = 0;
             other.data = nullptr; // the other tensor object is left empty (not 0D, but properly empty)
+        }
+        template <Numeric U> requires (std::is_convertible<U, T>::value)
+        tensor(const tensor<U> &other) : _shape{other._shape}, vol{other.vol} {
+            if (!this->vol) {
+                if (this->_shape._r >= 1)
+                    this->data = new T[this->vol];
+                return;
+            }
+            this->data = new T[this->vol];
+            gen::copy(this->data, other.data, this->vol);
         }
         explicit tensor(const char *tsr_path) /* : _shape{false} */ {
             process_tsr(tsr_path);

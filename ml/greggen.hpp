@@ -126,6 +126,14 @@ namespace gml {
             }
             return true;
         }
+        template <typename to, typename from> requires (std::is_convertible<from, to>::value)
+        bool copy(to *dst, const from *src, uint64_t _num) {
+            if (!dst || !src)
+                return false;
+            while (_num --> 0)
+                *dst++ = *src++;
+            return true;
+        }
         uint64_t strlen_c(const char *str) {
             if (!str)
                 return -1;

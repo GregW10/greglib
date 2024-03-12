@@ -15,6 +15,8 @@ namespace gml {
     public:
         vector_base(const vector_base<T> &other) : matrix<T>{other} {}
         vector_base(vector_base<T> &&other) : matrix<T>{std::move(other)} {}
+        template <Numeric U> requires (std::is_convertible<U, T>::value)
+        vector_base(const vector_base<U> &other) : matrix<T>{other} {}
         mulComT<T, T> mag_sq() const noexcept { // squared magnitude of the vector
             mulComT<T, T> _tot{};
             T *ptr = matrix<T>::data;
@@ -194,6 +196,8 @@ namespace gml {
             _cv = !_cv; // transforms a column to row vector or vice-versa
             return *this;
         }
+        template <Numeric U> requires (std::is_convertible<U, T>::value)
+        vector(const vector<U> &other) : vector_base<T>{other} {}
         vector &reshape(const tensor_shape &new_shape) override {
             if (new_shape._r != 2)
                 throw std::invalid_argument{"Error: a vector must have a rank of 2.\n"};

@@ -77,8 +77,8 @@ namespace gml {
         }
     }
     namespace losses {
-        template <Numeric T>
-        std::pair<T, vector<T>> sqloss(const vector<T> &_y, const vector<T> &_f) {
+        template <Numeric T, Numeric U> requires (std::is_convertible<subComT<T, U>, T>::value)
+        std::pair<T, vector<T>> sqloss(const vector<U> &_y, const vector<T> &_f) {
             /* Square loss. Returns the loss itself and the derivative of the loss w.r.t. output vector `_f`. */
             vector<T> diff = _f - _y; // this way round because of also returning derivative of loss
             return {diff.mag_sq(), 2*diff};
@@ -317,7 +317,7 @@ namespace gml {
         };
     private:
         std::deque<layer> layers{};
-        std::pair<T, vector<T>> (*_lossf)(const vector<T>&, const vector<T>&) = losses::sqloss;
+        std::pair<T, vector<T>> (*_lossf)(const vector<T>&, const vector<T>&) = losses::sqloss<T, T>;
         T _loss{}; // cumulative loss
         vector<T> _foutput{}; // to store the final output of the network after a forward pass
         uint64_t _bsize = 0; // counter for number of forwards/backwards passes performed ( == num. batches)
@@ -408,6 +408,12 @@ namespace gml {
         explicit ffnn(const char *nnw_path) {
             if (!nnw_path)
                 throw std::invalid_argument{"Error: path to .nnw file cannot be `nullptr`.\n"};
+            this->load_nnw(nnw_path);
+        }
+        void load_model(const char *nnw_path) {
+            if (!nnw_path)
+                return;
+            this->layers.clear();
             this->load_nnw(nnw_path);
         }
         template <typename ...Args>

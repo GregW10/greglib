@@ -146,6 +146,8 @@ namespace gml {
             tensor<T>::vol = other.vol;
             tensor<T>::data = other.data; */
         }
+        template <Numeric U> requires (std::is_convertible<U, T>::value)
+        matrix(const matrix<U> &other) : tensor<T>{other} {}
         matrix &reshape(const tensor_shape &new_shape) override {
             if (new_shape._r != 2)
                 throw exceptions::dimension_mismatch_error{"Error: a matrix must have a rank of 2.\n"};
