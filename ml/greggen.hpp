@@ -2,6 +2,9 @@
 #define GREGGEN_HPP
 
 #include <type_traits>
+#include <sstream>
+#include <chrono>
+#include <ctime>
 
 #define MILLION 1'000'000.0l
 #define BILLION 1'000'000'000.0l
@@ -196,6 +199,30 @@ namespace gml {
             while (++_begin != _end)
                 _prod *= *_begin;
             return _prod;
+        }
+        [[nodiscard("Returns dynamically allocated memory.\n")]] char *now_str() {
+            /* Returns the current date and time as a dynamically allocated string. */
+            time_t _tt;
+            time(&_tt);
+            struct tm _tm;
+            localtime_r(&_tt, &_tm);
+            std::ostringstream oss; // no choice if I want to use `std::put_time`
+            oss << std::put_time(&_tm, "%d_%B_%Y_%Hh:%Mm:%Ss");
+            char *_str = new char[oss.tellp() + 1];
+            strcpy_c(_str, oss.rdbuf()->view().data());
+            return _str;
+        }
+        [[nodiscard("Returns dynamically allocated memory.\n")]] char *now_str(const char *prefix, const char *suffix) {
+            /* Returns the current date and time as a dynamically allocated string. */
+            time_t _tt;
+            time(&_tt);
+            struct tm _tm;
+            localtime_r(&_tt, &_tm);
+            std::ostringstream oss; // no choice if I want to use `std::put_time`
+            oss << prefix << std::put_time(&_tm, "%d_%B_%Y_%Hh:%Mm:%Ss") << suffix;
+            char *_str = new char[oss.tellp() + 1];
+            strcpy_c(_str, oss.rdbuf()->view().data());
+            return _str;
         }
     }
 }

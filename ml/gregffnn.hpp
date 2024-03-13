@@ -77,11 +77,16 @@ namespace gml {
         }
     }
     namespace losses {
-        template <Numeric T, Numeric U> requires (std::is_convertible<subComT<T, U>, T>::value)
+        template <Numeric T, Numeric U, bool WithGrad = true> requires (std::is_convertible<subComT<T, U>, T>::value)
         std::pair<T, vector<T>> sqloss(const vector<U> &_y, const vector<T> &_f) {
             /* Square loss. Returns the loss itself and the derivative of the loss w.r.t. output vector `_f`. */
             vector<T> diff = _f - _y; // this way round because of also returning derivative of loss
             return {diff.mag_sq(), 2*diff};
+        }
+        template <Numeric T, Numeric U> requires (std::is_convertible<subComT<T, U>, T>::value)
+        T sqloss<T, U, false>(const vector<U> &_y, const vector<T> &_f) {
+            /* Square loss. Returns only the loss itself. */
+            return (_y - _f).mag_sq(); // write manually instead to avoid creating unnecessary `vector<T>` object
         }
     }
     enum initialiser {
@@ -539,6 +544,12 @@ namespace gml {
             for (const layer &_layer : this->layers)
                 _tot_params += _layer.wvol + _layer.DN;
             return 12 + this->layers.size()*sizeof(ichunk_t) + sizeof(T)*_tot_params;
+        }
+        std::ofstream::pos_type to_nnw() const {
+            char *path = gen::now_str("NN_weights_", ".nnw");
+            std::ofstream::pos_type _pos = this->to_nnw(path);
+            delete [] path;
+            return _pos;
         }
         std::ofstream::pos_type to_nnw(const char *path) const {
             /* Writes the entire network's weights, biases and activation function IDs to a .nnw file. */
