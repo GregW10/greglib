@@ -183,6 +183,8 @@ namespace gml {
         }
         vector(const vector<T> &other) : vector_base<T>{other}, _cv{other._cv} {}
         vector(vector<T> &&other) noexcept : vector_base<T>{std::move(other)}, _cv{other._cv} {}
+        template <Numeric U> requires (std::is_convertible<U, T>::value)
+        vector(const vector<U> &other) : vector_base<T>{other}, _cv{other._cv} {}
         vector &transpose() noexcept /* override */ { // `override` is commented until I write the method in `matrix<T>`
             if (_cv) {
                 *vector_base<T>::_shape._s = 1;
@@ -196,8 +198,6 @@ namespace gml {
             _cv = !_cv; // transforms a column to row vector or vice-versa
             return *this;
         }
-        template <Numeric U> requires (std::is_convertible<U, T>::value)
-        vector(const vector<U> &other) : vector_base<T>{other} {}
         vector &reshape(const tensor_shape &new_shape) override {
             if (new_shape._r != 2)
                 throw std::invalid_argument{"Error: a vector must have a rank of 2.\n"};
@@ -283,7 +283,7 @@ namespace gml {
                 matrix<T>::data = new T[0];
                 return *this;
             }
-            T *ndata = new T[*mat._shape._s]; // need to allocate, even if vector doesn't change size
+            T *ndata = new T[*mat._shape._s]{}; // need to allocate, even if vector doesn't change size
             uint64_t _i = *mat._shape._s; // new dimensionality of vector
             uint64_t _j;
             T *ptr;
@@ -335,6 +335,7 @@ namespace gml {
                 ++nptr;
             }
             *(matrix<T>::_shape._s + 1) = _m;
+            *matrix<T>::_shape.sizes = _m;
             matrix<T>::vol = _m;
             delete [] matrix<T>::data;
             matrix<T>::data = ndata;
@@ -395,6 +396,7 @@ namespace gml {
             EX_MAT_EQ("2D tensor")
             return static_cast<vector<T>&>(tensor<T>::operator=(std::move(other)));
         }
+#undef EX_MAT_EQ
         vector<T> &operator+=(const tensor<T> &other) override {
             return static_cast<vector<T>&>(tensor<T>::operator+=(other));
         }
@@ -402,92 +404,15 @@ namespace gml {
             return static_cast<vector<T>&>(tensor<T>::operator-=(other));
         }
         template <Numeric U, Numeric V>
-        friend vector<addComT<U, V>> operator+(const vector<U> &vec1, const vector<V> &vec2) {
-            if (vec1._cv != vec2._cv || vec1.vol != vec2.vol)
-                throw exceptions::dimension_mismatch_error{"Error: addition between vectors can only be performed "
-                                                           "between vectors of equal shapes.\n"};
-            if (vec1._shape._r == -1) // would only happen if vector has been moved from
-                return {};
-            addComT<U, V> *_ndata = new addComT<U, V>[vec1.vol];
-            uint64_t counter = vec1.vol;
-            addComT<U, V> *nptr = _ndata;
-            U *d1 = vec1.data;
-            V *d2 = vec2.data;
-            while (counter --> 0)
-                *nptr++ = *d1++ + *d2++;
-            return {_ndata, vec1._shape._r, vec1._shape._s, vec1.vol, true}; // let ctor make a copy of the shape array
-        }
+        friend vector<addComT<U, V>> operator+(const vector<U>&, const vector<V>&);
         template <Numeric U, Numeric V>
-        friend vector<subComT<U, V>> operator-(const vector<U> &vec1, const vector<V> &vec2) {
-            if (vec1._cv != vec2._cv || vec1.vol != vec2.vol)
-                throw exceptions::dimension_mismatch_error{"Error: subtraction between vectors can only be performed "
-                                                           "between vectors of equal shapes.\n"};
-            if (vec1._shape._r == -1)
-                return {};
-            subComT<U, V> *_ndata = new subComT<U, V>[vec1.vol];
-            uint64_t counter = vec1.vol;
-            subComT<U, V> *nptr = _ndata;
-            U *d1 = vec1.data;
-            V *d2 = vec2.data;
-            while (counter --> 0)
-                *nptr++ = *d1++ - *d2++;
-            return {_ndata, vec1._shape._r, vec1._shape._s, vec1.vol, true};
-        }
+        friend vector<subComT<U, V>> operator-(const vector<U>&, const vector<V>&);
         template <Numeric U, Numeric V>
-        friend vector<mulComT<U, V>> operator*(const U &scalar, const vector<V> &vec) {
-            if (vec._shape._r == -1)
-                return {};
-            mulComT<U, V> *_ndata = new mulComT<U, V>[vec.vol];
-            uint64_t counter = vec.vol;
-            mulComT<U, V> *nptr = _ndata;
-            V *vptr = vec.data;
-            while (counter --> 0)
-                *nptr++ = scalar*(*vptr++);
-            return {_ndata, vec._shape._r, vec._shape._s, vec.vol, true};
-        }
+        friend vector<mulComT<U, V>> operator*(const U&, const vector<V>&);
         template <Numeric U, Numeric V>
-        friend vector<divComT<U, V>> operator/(const vector<U> &vec, const V &scalar) {
-            if (vec._shape._r == -1)
-                return {};
-            divComT<U, V> *_ndata = new divComT<U, V>[vec.vol];
-            uint64_t counter = vec.vol;
-            divComT<U, V> *nptr = _ndata;
-            U *vptr = vec.data;
-            while (counter --> 0)
-                *nptr++ = (*vptr++)/scalar;
-            return {_ndata, vec._shape._r, vec._shape._s, vec.vol, true};
-        }
-#undef EX_MAT_EQ
+        friend vector<divComT<U, V>> operator/(const vector<U>&, const V&);
         template <Numeric U, Numeric V>
-        friend vector<mulComT<U, V>> matcvecmul(const matrix<U> &mat, const vector<V> &vec) {
-            /* This function provides dedicated multiplication between an `N x M` matrix and an `M x 1` vector. I could
-             * not define this as another `operator*` overload because of the exception I have to throw if `vec` is a
-             * row vector, which would make any multiplication between an `N x 1` matrix and `1 x M` vector impossible,
-             * since that would require returning a `matrix<T>` with shape `N x M`, and C++ is statically typed. */
-            if (!vec._cv)
-                throw exceptions::matmul_error{"Error: column vector expected.\n"};
-            if (*(mat._shape._s + 1) != *vec._shape._s)
-                throw exceptions::dimension_mismatch_error{"Error: number of columns in matrix does not match "
-                                                           "dimensionality of vector.\n"};
-            uint64_t _n = *mat._shape._s; // dimensionality of new vector
-            if (!_n)
-                return {}; // return empty vector if multiplying by empty matrix
-            uint64_t _i = _n;
-            uint64_t _j;
-            mulComT<U, V> *ndata = new mulComT<U, V>[_n]{};
-            mulComT<U, V> *nptr = ndata;
-            U *mptr = mat.data;
-            V *vptr;
-            while (_i --> 0) {
-                _j = vec.vol;
-                vptr = vec.data;
-                while (_j --> 0)
-                    *nptr += (*mptr++)*(*vptr++);
-                ++nptr;
-            }
-            uint64_t *nshape = new uint64_t[2]{_n, 1};
-            return {ndata, 2, nshape, _n, false};
-        }
+        friend vector<mulComT<U, V>> matcvecmul(const matrix<U>&, const vector<V>&);
         template <Numeric U, Numeric V>
         friend vector<mulComT<U, V>> tens_ops::hadamard(const vector<U>&, const vector<V>&);
         template <Numeric>
@@ -495,6 +420,92 @@ namespace gml {
         template <Numeric>
         friend class ffnn;
     };
+    template <Numeric U, Numeric V>
+    vector<addComT<U, V>> operator+(const vector<U> &vec1, const vector<V> &vec2) {
+        if (vec1._cv != vec2._cv || vec1.vol != vec2.vol)
+            throw exceptions::dimension_mismatch_error{"Error: addition between vectors can only be performed "
+                                                       "between vectors of equal shapes.\n"};
+        if (vec1._shape._r == -1) // would only happen if vector has been moved from
+            return {};
+        addComT<U, V> *_ndata = new addComT<U, V>[vec1.vol];
+        uint64_t counter = vec1.vol;
+        addComT<U, V> *nptr = _ndata;
+        U *d1 = vec1.data;
+        V *d2 = vec2.data;
+        while (counter --> 0)
+            *nptr++ = *d1++ + *d2++;
+        return {_ndata, vec1._shape._r, vec1._shape._s, vec1.vol, true}; // let ctor make a copy of the shape array
+    }
+    template <Numeric U, Numeric V>
+    vector<subComT<U, V>> operator-(const vector<U> &vec1, const vector<V> &vec2) {
+        if (vec1._cv != vec2._cv || vec1.vol != vec2.vol)
+            throw exceptions::dimension_mismatch_error{"Error: subtraction between vectors can only be performed "
+                                                       "between vectors of equal shapes.\n"};
+        if (vec1._shape._r == -1)
+            return {};
+        subComT<U, V> *_ndata = new subComT<U, V>[vec1.vol];
+        uint64_t counter = vec1.vol;
+        subComT<U, V> *nptr = _ndata;
+        U *d1 = vec1.data;
+        V *d2 = vec2.data;
+        while (counter --> 0)
+            *nptr++ = *d1++ - *d2++;
+        return {_ndata, vec1._shape._r, vec1._shape._s, vec1.vol, true};
+    }
+    template <Numeric U, Numeric V>
+    vector<mulComT<U, V>> operator*(const U &scalar, const vector<V> &vec) {
+        if (vec._shape._r == -1)
+            return {};
+        mulComT<U, V> *_ndata = new mulComT<U, V>[vec.vol];
+        uint64_t counter = vec.vol;
+        mulComT<U, V> *nptr = _ndata;
+        V *vptr = vec.data;
+        while (counter --> 0)
+            *nptr++ = scalar*(*vptr++);
+        return {_ndata, vec._shape._r, vec._shape._s, vec.vol, true};
+    }
+    template <Numeric U, Numeric V>
+    vector<divComT<U, V>> operator/(const vector<U> &vec, const V &scalar) {
+        if (vec._shape._r == -1)
+            return {};
+        divComT<U, V> *_ndata = new divComT<U, V>[vec.vol];
+        uint64_t counter = vec.vol;
+        divComT<U, V> *nptr = _ndata;
+        U *vptr = vec.data;
+        while (counter --> 0)
+            *nptr++ = (*vptr++)/scalar;
+        return {_ndata, vec._shape._r, vec._shape._s, vec.vol, true};
+    }
+    template <Numeric U, Numeric V>
+    vector<mulComT<U, V>> matcvecmul(const matrix<U> &mat, const vector<V> &vec) {
+        /* This function provides dedicated multiplication between an `N x M` matrix and an `M x 1` vector. I could
+         * not define this as another `operator*` overload because of the exception I have to throw if `vec` is a
+         * row vector, which would make any multiplication between an `N x 1` matrix and `1 x M` vector impossible,
+         * since that would require returning a `matrix<T>` with shape `N x M`, and C++ is statically typed. */
+        if (!vec._cv)
+            throw exceptions::matmul_error{"Error: column vector expected.\n"};
+        if (*(mat._shape._s + 1) != *vec._shape._s)
+            throw exceptions::dimension_mismatch_error{"Error: number of columns in matrix does not match "
+                                                       "dimensionality of vector.\n"};
+        uint64_t _n = *mat._shape._s; // dimensionality of new vector
+        if (!_n)
+            return {}; // return empty vector if multiplying by empty matrix
+        uint64_t _i = _n;
+        uint64_t _j;
+        mulComT<U, V> *ndata = new mulComT<U, V>[_n]{};
+        mulComT<U, V> *nptr = ndata;
+        U *mptr = mat.data;
+        V *vptr;
+        while (_i --> 0) {
+            _j = vec.vol;
+            vptr = vec.data;
+            while (_j --> 0)
+                *nptr += (*mptr++)*(*vptr++);
+            ++nptr;
+        }
+        uint64_t *nshape = new uint64_t[2]{_n, 1};
+        return {ndata, 2, nshape, _n, false};
+    }
     namespace tens_ops {
         template <Numeric U, Numeric V>
         vector<mulComT<U, V>> hadamard(const vector<U> &vec1, const vector<V> &vec2) {

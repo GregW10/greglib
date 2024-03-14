@@ -56,7 +56,7 @@ namespace gml {
             return _funcs.at(_id);
         }
         template <Numeric T>
-        std::pair<void (*)(T&), void (*)(T&)> get_id_by_func(void (*_f)(T&)) {
+        uint32_t get_id_by_func(void (*_f)(T&)) {
             /* Returns the ID of activation function `_f`. */
             static const std::map<void (*)(T&), uint32_t> _funcs = {
                     {nullptr, 0},
@@ -66,7 +66,7 @@ namespace gml {
             return _funcs.at(_f);
         }
         template <Numeric T>
-        std::pair<void (*)(T&), void (*)(T&)> get_id_by_dfunc(void (*_f)(T&)) {
+        uint32_t get_id_by_dfunc(void (*_f)(T&)) {
             /* Returns the ID of the activation function derivative `_f`. */
             static const std::map<void (*)(T&), uint32_t> _funcs = {
                     {nullptr, 0},
@@ -77,17 +77,17 @@ namespace gml {
         }
     }
     namespace losses {
-        template <Numeric T, Numeric U, bool WithGrad = true> requires (std::is_convertible<subComT<T, U>, T>::value)
+        template <Numeric T, Numeric U/*,bool WithGrad = true*/> requires (std::is_convertible<subComT<T, U>, T>::value)
         std::pair<T, vector<T>> sqloss(const vector<U> &_y, const vector<T> &_f) {
             /* Square loss. Returns the loss itself and the derivative of the loss w.r.t. output vector `_f`. */
             vector<T> diff = _f - _y; // this way round because of also returning derivative of loss
             return {diff.mag_sq(), 2*diff};
         }
-        template <Numeric T, Numeric U> requires (std::is_convertible<subComT<T, U>, T>::value)
-        T sqloss<T, U, false>(const vector<U> &_y, const vector<T> &_f) {
-            /* Square loss. Returns only the loss itself. */
-            return (_y - _f).mag_sq(); // write manually instead to avoid creating unnecessary `vector<T>` object
-        }
+        // template <Numeric T, Numeric U> requires (std::is_convertible<subComT<T, U>, T>::value)
+        // T sqloss<T, U, false>(const vector<U> &_y, const vector<T> &_f) {
+        //     /* Square loss. Returns only the loss itself. */
+        //     return (_y - _f).mag_sq(); // write manually instead to avoid creating unnecessary `vector<T>` object
+        // }
     }
     enum initialiser {
         ZEROS, ONES, GLOROT_UNIFORM, GLOROT_NORMAL
@@ -150,6 +150,34 @@ namespace gml {
                 T *_biases;
             };
 #pragma pack(pop)
+            class ctor_helper {
+                T *_dataW{};
+                int64_t rankW{};
+                uint64_t *_sW{};
+                uint64_t _volumeW{};
+                bool copy_shapeW{};
+                T *_data_b{};
+                int64_t rank_b{};
+                uint64_t *_s_b{};
+                uint64_t _volume_b{};
+                bool copy_shape_b{};
+                uint64_t _actfunc_id{};
+                ctor_helper(T *_dataW_p,
+                            int64_t rankW_p,
+                            uint64_t *_sW_p,
+                            uint64_t _volumeW_p,
+                            bool copy_shapeW_p,
+                            T *_data_b_p,
+                            int64_t rank_b_p,
+                            uint64_t *_s_b_p,
+                            uint64_t _volume_b_p,
+                            bool copy_shape_b_p,
+                            uint64_t _actfunc_id_p) :_dataW{_dataW_p}, rankW{rankW_p}, _sW{_sW_p}, _volumeW{_volumeW_p},
+                            copy_shapeW{copy_shapeW_p}, _data_b{_data_b_p}, rank_b{rank_b_p}, _s_b{_s_b_p},
+                            _volume_b{_volume_b_p}, copy_shape_b{copy_shape_b_p}, _actfunc_id{_actfunc_id_p} {}
+            public:
+                friend class ffnn;
+            };
             layer(uint64_t _input_dim,
                   uint64_t _output_dim,
                   void (*act_func)(T&) = nullptr,
@@ -177,6 +205,15 @@ namespace gml {
                         init_glono();
                         break;
                 }
+            }
+            layer(const ctor_helper &_ch) :
+            DN{*_ch._sW}, DNm1{*(_ch._sW + 1)}, W{_ch._dataW, _ch.rankW, _ch._sW, _ch._volumeW, _ch.copy_shapeW},
+            _b{_ch._data_b, _ch.rank_b, _ch._s_b, _ch._volume_b, _ch.copy_shape_b, true} {
+                try {
+                    auto [f1, f2] = activations::get_func_by_id<T>(_ch._actfunc_id);
+                    _sigma = f1;
+                    _sigmap = f2;
+                } catch(const std::out_of_range&) {/* `_sigma` and `_sigmap` already `nullptr`, no action required */}
             }
             const matrix<T> &weights() const noexcept {
                 return this->W;
@@ -270,6 +307,7 @@ namespace gml {
             vector<T> &fprop_eval(vector<T> &_input) const {
                 /* Forward-propagate without recording anything. */
                 _input.apply_cv(W).operator+=(_b);
+                // _input = matcvecmul(W, _input) + _b;
                 if (_sigma)
                     _input.for_each(_sigma);
                 return _input;
@@ -318,8 +356,10 @@ namespace gml {
                 bpropped = false;
                 return *this;
             }
+            // template <Numeric>
             friend class ffnn;
         };
+        using ctorh_t = typename layer::ctor_helper;
     private:
         std::deque<layer> layers{};
         std::pair<T, vector<T>> (*_lossf)(const vector<T>&, const vector<T>&) = losses::sqloss<T, T>;
@@ -386,8 +426,10 @@ namespace gml {
                 _wshape[1] = iptr->_idim;
                 _bshape[0] = iptr->_odim;
                 _bshape[1] = 1;
-                this->layers.emplace_back(_dataW, 2, _wshape, _wvol, true, _data_b, 2, _bshape, iptr->_odim, true,
-                                          iptr->_fid);
+                /* this->layers.emplace_back(_dataW, 2, _wshape, _wvol, true, _data_b, 2, _bshape, iptr->_odim, true,
+                                          iptr->_fid); */
+                this->layers.emplace_back(ctorh_t{_dataW, 2, _wshape, _wvol, true, _data_b, 2, _bshape,
+                                                  iptr->_odim, true, iptr->_fid});
                 ++iptr;
             }
             delete [] _ichunks;
@@ -528,6 +570,7 @@ namespace gml {
         }
         vector<T> fpass_eval(const vector<T> &_input) const {
             vector<T> retvec = _input;
+            // std::cout << "Retvec:\n" << retvec << std::endl;
             for (const layer &_layer : this->layers)
                 _layer.fprop_eval(retvec);
             return retvec;

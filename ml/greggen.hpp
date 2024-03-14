@@ -5,6 +5,7 @@
 #include <sstream>
 #include <chrono>
 #include <ctime>
+#include <iomanip>
 
 #define MILLION 1'000'000.0l
 #define BILLION 1'000'000'000.0l
@@ -208,7 +209,7 @@ namespace gml {
             localtime_r(&_tt, &_tm);
             std::ostringstream oss; // no choice if I want to use `std::put_time`
             oss << std::put_time(&_tm, "%d_%B_%Y_%Hh:%Mm:%Ss");
-            char *_str = new char[oss.tellp() + 1];
+            char *_str = new char[static_cast<std::streamoff>(oss.tellp()) + 1];
             strcpy_c(_str, oss.rdbuf()->view().data());
             return _str;
         }
@@ -220,7 +221,7 @@ namespace gml {
             localtime_r(&_tt, &_tm);
             std::ostringstream oss; // no choice if I want to use `std::put_time`
             oss << prefix << std::put_time(&_tm, "%d_%B_%Y_%Hh:%Mm:%Ss") << suffix;
-            char *_str = new char[oss.tellp() + 1];
+            char *_str = new char[static_cast<std::streamoff>(oss.tellp()) + 1];
             strcpy_c(_str, oss.rdbuf()->view().data());
             return _str;
         }

@@ -6,3 +6,4 @@ Notes for improvements I have to make in my ML frameworks:
 - Add more loss functions
 - I should have a separate program which loads a .nnw file and a .normv and tests it on data (perhaps one .3bod file, on all possible pairs, or perhaps same time window and shifting the window across the file)
 - Allow lookup of loss functions by ID, as you've done with the activation functions (using a static `std::map`)
+- Include signal handling in nn.cpp

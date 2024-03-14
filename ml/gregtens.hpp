@@ -351,6 +351,8 @@ namespace gml {
         friend vector<divComT<U, V>> operator/(const vector<U>&, const V&);
         template <Numeric U, Numeric V>
         friend matrix<mulComT<U, V>> operator*(const matrix<U>&, const matrix<V>&);
+        template <Numeric U, Numeric V>
+        friend vector<mulComT<U, V>> matcvecmul(const matrix<U>&, const vector<V>&);
         template <Numeric>
         friend class ffnn;
     };
@@ -787,61 +789,13 @@ namespace gml {
             return *this;
         }
         template <Numeric U, Numeric V>
-        friend tensor<addComT<U, V>> operator+(const tensor<U> &t1, const tensor<V> &t2) {
-            if (t1._shape != t2._shape)
-                throw exceptions::dimension_mismatch_error{"Error: addition between tensors can only be performed "
-                                                           "between tensors of equal shapes.\n"};
-            if (t1._shape._r == -1) // case for addition between two empty tensors
-                return {}; // empty tensor returned
-            addComT<U, V> *_ndata = new addComT<U, V>[t1.vol];
-            uint64_t counter = t1.vol;
-            addComT<U, V> *nptr = _ndata;
-            U *d1 = t1.data;
-            V *d2 = t2.data;
-            while (counter --> 0)
-                *nptr++ = *d1++ + *d2++;
-            return {_ndata, t1._shape._r, t1._shape._s, t1.vol, true}; // let ctor make a copy of the shape array
-        }
+        friend tensor<addComT<U, V>> operator+(const tensor<U>&, const tensor<V>&);
         template <Numeric U, Numeric V>
-        friend tensor<subComT<U, V>> operator-(const tensor<U> &t1, const tensor<V> &t2) {
-            if (t1._shape != t2._shape)
-                throw exceptions::dimension_mismatch_error{"Error: subtraction between tensors can only be performed "
-                                                           "between tensors of equal shapes.\n"};
-            if (t1._shape._r == -1)
-                return {};
-            subComT<U, V> *_ndata = new subComT<U, V>[t1.vol];
-            uint64_t counter = t1.vol;
-            subComT<U, V> *nptr = _ndata;
-            U *d1 = t1.data;
-            V *d2 = t2.data;
-            while (counter --> 0)
-                *nptr++ = *d1++ - *d2++;
-            return {_ndata, t1._shape._r, t1._shape._s, t1.vol, true};
-        }
+        friend tensor<subComT<U, V>> operator-(const tensor<U>&, const tensor<V>&);
         template <Numeric U, Numeric V>
-        friend tensor<mulComT<U, V>> operator*(const U &scalar, const tensor<V> &tens) {
-            if (tens._shape._r == -1)
-                return {};
-            mulComT<U, V> *_ndata = new mulComT<U, V>[tens.vol];
-            uint64_t counter = tens.vol;
-            mulComT<U, V> *nptr = _ndata;
-            V *vptr = tens.data;
-            while (counter --> 0)
-                *nptr++ = scalar*(*vptr++);
-            return {_ndata, tens._shape._r, tens._shape._s, tens.vol, true};
-        }
+        friend tensor<mulComT<U, V>> operator*(const U&, const tensor<V>&);
         template <Numeric U, Numeric V>
-        friend tensor<divComT<U, V>> operator/(const tensor<U> &tens, const V &scalar) {
-            if (tens._shape._r == -1)
-                return {};
-            divComT<U, V> *_ndata = new divComT<U, V>[tens.vol];
-            uint64_t counter = tens.vol;
-            divComT<U, V> *nptr = _ndata;
-            U *vptr = tens.data;
-            while (counter --> 0)
-                *nptr++ = (*vptr++)/scalar;
-            return {_ndata, tens._shape._r, tens._shape._s, tens.vol, true};
-        }
+        friend tensor<divComT<U, V>> operator/(const tensor<U>&, const V&);
         template <Numeric U, Numeric V>
         friend tensor<mulComT<U, V>> tens_ops::hadamard(const tensor<U>&, const tensor<V>&);
         template <Numeric U>
@@ -896,6 +850,62 @@ namespace gml {
     template <Numeric U, Numeric V>
     bool operator!=(const tensor<U> &t1, const tensor<V> &t2) {
         return !operator==(t1, t2);
+    }
+    template <Numeric U, Numeric V>
+    tensor<addComT<U, V>> operator+(const tensor<U> &t1, const tensor<V> &t2) {
+        if (t1._shape != t2._shape)
+            throw exceptions::dimension_mismatch_error{"Error: addition between tensors can only be performed "
+                                                       "between tensors of equal shapes.\n"};
+        if (t1._shape._r == -1) // case for addition between two empty tensors
+            return {}; // empty tensor returned
+        addComT<U, V> *_ndata = new addComT<U, V>[t1.vol];
+        uint64_t counter = t1.vol;
+        addComT<U, V> *nptr = _ndata;
+        U *d1 = t1.data;
+        V *d2 = t2.data;
+        while (counter --> 0)
+            *nptr++ = *d1++ + *d2++;
+        return {_ndata, t1._shape._r, t1._shape._s, t1.vol, true}; // let ctor make a copy of the shape array
+    }
+    template <Numeric U, Numeric V>
+    tensor<subComT<U, V>> operator-(const tensor<U> &t1, const tensor<V> &t2) {
+        if (t1._shape != t2._shape)
+            throw exceptions::dimension_mismatch_error{"Error: subtraction between tensors can only be performed "
+                                                       "between tensors of equal shapes.\n"};
+        if (t1._shape._r == -1)
+            return {};
+        subComT<U, V> *_ndata = new subComT<U, V>[t1.vol];
+        uint64_t counter = t1.vol;
+        subComT<U, V> *nptr = _ndata;
+        U *d1 = t1.data;
+        V *d2 = t2.data;
+        while (counter --> 0)
+            *nptr++ = *d1++ - *d2++;
+        return {_ndata, t1._shape._r, t1._shape._s, t1.vol, true};
+    }
+    template <Numeric U, Numeric V>
+    tensor<mulComT<U, V>> operator*(const U &scalar, const tensor<V> &tens) {
+        if (tens._shape._r == -1)
+            return {};
+        mulComT<U, V> *_ndata = new mulComT<U, V>[tens.vol];
+        uint64_t counter = tens.vol;
+        mulComT<U, V> *nptr = _ndata;
+        V *vptr = tens.data;
+        while (counter --> 0)
+            *nptr++ = scalar*(*vptr++);
+        return {_ndata, tens._shape._r, tens._shape._s, tens.vol, true};
+    }
+    template <Numeric U, Numeric V>
+    tensor<divComT<U, V>> operator/(const tensor<U> &tens, const V &scalar) {
+        if (tens._shape._r == -1)
+            return {};
+        divComT<U, V> *_ndata = new divComT<U, V>[tens.vol];
+        uint64_t counter = tens.vol;
+        divComT<U, V> *nptr = _ndata;
+        U *vptr = tens.data;
+        while (counter --> 0)
+            *nptr++ = (*vptr++)/scalar;
+        return {_ndata, tens._shape._r, tens._shape._s, tens.vol, true};
     }
     namespace tens_ops {
         template <Numeric U, Numeric V>

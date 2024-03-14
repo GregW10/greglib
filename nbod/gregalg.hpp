@@ -126,17 +126,36 @@ concept forwardIterator = requires (IT it, IT other) {
 };
     constexpr long double PI = 3.14159265358979323846264338327950288419716939937510582097494459230l;
     std::mutex g_mutex; // a global mutex which can be used in any function, in any thread, to avoid race conditions
-    template<typename T>
-    inline void swap(T &A, T &B) {
-        T C{A};
-        A = B;
-        B = C;
+    /* the below function, simple as it is, I find highly useful as it performs a byte-wise swap, and can, therefore,
+     * be used on objects without touching any of their copy constructors */
+    void swap(void *one, void *two, size_t size) {
+        if (!one || !two || !size)
+            return;
+        char temp;
+        char *first = (char *) one;
+        char *second = (char *) two;
+        while (size --> 0) {
+            temp = *first;
+            *first++ = *second;
+            *second++ = temp;
+        }
     }
-    template<typename T>
-    inline void swap(T *A, T *B) {
-        T C{*A};
-        *A = *B;
-        *B = C;
+    void move(void *dest, void *source, size_t size) {
+        if (!dest || !source || !size)
+            return;
+        char *dst = (char *) dest;
+        char *src = (char *) source;
+        while (size --> 0) {
+            *dst++ = *src;
+            *src++ = 0;
+        }
+    }
+    void copy(void *dest, const void *source, size_t size) {
+        if (!dest || !source || !size)
+            return;
+        char *dst = (char *) dest;
+        char *src = (char *) source;
+        while (size --> 0) *dst++ = *src++;
     }
     template <typename T> requires requires (T a, T b) {{a <= b} -> std::same_as<bool>;}
     inline bool le(const T &a, const T &b) {
@@ -259,7 +278,7 @@ concept forwardIterator = requires (IT it, IT other) {
             --end; // discard last element from consideration after each sort
             for (; second <= end; ++first, ++second) {
                 if (!compare(*first, *second)) {
-                    swap(first, second);
+                    swap(first, second, sizeof(T));
                     continue;
                 }
                 ++count;
@@ -312,7 +331,7 @@ concept forwardIterator = requires (IT it, IT other) {
         if (begin == end)
             return;
         while (begin < end)
-            swap(*begin++, *end--);
+            swap(&(*begin++), &(*end--), sizeof(*begin));
     }
     template<forwardIterator fIT, typename T>
     void fill(fIT begin, fIT end, const T &value) {
@@ -320,37 +339,6 @@ concept forwardIterator = requires (IT it, IT other) {
             return;
         while (begin != end)
             *begin++ = value;
-    }
-    /* the below function, simple as it is, I find highly useful as it performs a byte-wise swap, and can, therefore,
-     * be used on objects without touching any of their copy constructors */
-    void swap(void *one, void *two, size_t size) {
-        if (!one || !two || !size)
-            return;
-        char temp;
-        char *first = (char *) one;
-        char *second = (char *) two;
-        while (size --> 0) {
-            temp = *first;
-            *first++ = *second;
-            *second++ = temp;
-        }
-    }
-    void move(void *dest, void *source, size_t size) {
-        if (!dest || !source || !size)
-            return;
-        char *dst = (char *) dest;
-        char *src = (char *) source;
-        while (size --> 0) {
-            *dst++ = *src;
-            *src++ = 0;
-        }
-    }
-    void copy(void *dest, const void *source, size_t size) {
-        if (!dest || !source || !size)
-            return;
-        char *dst = (char *) dest;
-        char *src = (char *) source;
-        while (size --> 0) *dst++ = *src++;
     }
     inline long double rad_to_deg(const long double &radians) {
         return (radians*180)/PI;
