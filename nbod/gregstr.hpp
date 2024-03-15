@@ -1967,6 +1967,7 @@ namespace gtd {
         }
         return true;
     }
+#ifndef GREGMISC_HPP
     bool endswith(const char *str, const char *with) {
         if (!str || !with || !*with)
             return false;
@@ -1981,6 +1982,7 @@ namespace gtd {
         }
         return true;
     }
+#endif
     char **strsplit(const char *str, char delim = 32) {
         if (str == nullptr || !*str)
             return nullptr;

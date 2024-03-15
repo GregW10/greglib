@@ -298,6 +298,7 @@ namespace gml {
             }
             *matrix<T>::_shape._s = *mat._shape._s;
             matrix<T>::vol = *mat._shape._s;
+            // no need to set `matrix<T>::_shape.sizes[0]` since it must already be equal to one
             delete [] matrix<T>::data;
             matrix<T>::data = ndata;
             return *this;
@@ -312,6 +313,7 @@ namespace gml {
             uint64_t _m; // new dimensionality of vector (equal to number of columns in `mat`)
             if (!(_m = *(mat._shape._s + 1))) {
                 *(matrix<T>::_shape._s + 1) = 0;
+                *matrix<T>::_shape.sizes = 0; // number of elements per previous layer becomes zero
                 matrix<T>::vol = 0;
                 delete [] matrix<T>::data;
                 matrix<T>::data = new T[0];

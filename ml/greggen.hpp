@@ -61,7 +61,7 @@ namespace gml {
                 return false;
             char *dest = static_cast<char*>(dst);
             const char *source = static_cast<const char*>(src);
-            unsigned long long tot_bytes = elem_size*num_elems;
+            uint64_t tot_bytes = elem_size*num_elems;
             while (tot_bytes --> 0)
                 *dest++ = *source++;
             return true;
@@ -208,9 +208,12 @@ namespace gml {
             struct tm _tm;
             localtime_r(&_tt, &_tm);
             std::ostringstream oss; // no choice if I want to use `std::put_time`
-            oss << std::put_time(&_tm, "%d_%B_%Y_%Hh:%Mm:%Ss");
-            char *_str = new char[static_cast<std::streamoff>(oss.tellp()) + 1];
-            strcpy_c(_str, oss.rdbuf()->view().data());
+            oss << std::put_time(&_tm, "%d_%B_%Y_%Hh%Mm%Ss");
+            std::streamoff _off = static_cast<std::streamoff>(oss.tellp());
+            char *_str = new char[_off + 1];
+            // strcpy_c(_str, oss.rdbuf()->view().data());
+            memcopy(_str, oss.rdbuf()->view().data(), sizeof(char), _off);
+            *(_str + _off) = 0;
             return _str;
         }
         [[nodiscard("Returns dynamically allocated memory.\n")]] char *now_str(const char *prefix, const char *suffix) {
@@ -220,9 +223,12 @@ namespace gml {
             struct tm _tm;
             localtime_r(&_tt, &_tm);
             std::ostringstream oss; // no choice if I want to use `std::put_time`
-            oss << prefix << std::put_time(&_tm, "%d_%B_%Y_%Hh:%Mm:%Ss") << suffix;
-            char *_str = new char[static_cast<std::streamoff>(oss.tellp()) + 1];
-            strcpy_c(_str, oss.rdbuf()->view().data());
+            oss << prefix << std::put_time(&_tm, "%d_%B_%Y_%Hh%Mm%Ss") << suffix;
+            std::streamoff _off = static_cast<std::streamoff>(oss.tellp());
+            char *_str = new char[_off + 1];
+            // strcpy_c(_str, oss.rdbuf()->view().data());
+            memcopy(_str, oss.rdbuf()->view().data(), sizeof(char), _off);
+            *(_str + _off) = 0;
             return _str;
         }
     }

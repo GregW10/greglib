@@ -416,8 +416,11 @@ namespace gml {
             uint64_t _wshape[2];
             uint64_t _bshape[2];
             iptr = _ichunks;
-            counter = _hdr._numl;
-            while (counter --> 0) {
+            counter = 0;
+            typename std::deque<layer>::iterator _it;
+            layer *_last;
+            layer *_pn;
+            while (counter++ < _hdr._numl) {
                 _dataW = new T[(_wvol = iptr->_odim*iptr->_idim)];
                 _data_b = new T[iptr->_odim];
                 in.read((char *) _dataW, _wvol*sizeof(T));
@@ -430,6 +433,13 @@ namespace gml {
                                           iptr->_fid); */
                 this->layers.emplace_back(ctorh_t{_dataW, 2, _wshape, _wvol, true, _data_b, 2, _bshape,
                                                   iptr->_odim, true, iptr->_fid});
+                if (counter >= 2) {
+                    _last = &(*(--(_it = this->layers.end())));
+                    --_it;
+                    _pn = &(*_it);
+                    _last->prev = _pn;
+                    _pn->next = _last;
+                }
                 ++iptr;
             }
             delete [] _ichunks;

@@ -4,11 +4,67 @@
 #include <vector>
 #include <string>
 #include <dirent.h>
-#include "../nbod/gregstr.hpp"
+#include <stdexcept>
+#include <ios>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <limits.h>
 
 /* C++ header file containing miscellaneous function definitions. */
 
+#include <iostream>
+
 namespace gtd {
+    bool str_eq(const char *s1, const char *s2) {
+        if (!s1 || !s2)
+            return false;
+        while (*s1 || *s2)
+            if (*s1++ != *s2++)
+                return false;
+        return true;
+    }
+#ifndef GREGALG_HPP
+    bool memcopy(void *dst, const void *src, size_t bytes) {
+        if (!bytes || !dst || !src)
+            return false;
+        char *cdst = (char*) dst;
+        const char *csrc = (char*) src;
+        while (bytes --> 0)
+            *cdst++ = *csrc++;
+        return true;
+    }
+#endif
+#ifndef GREGSTR_HPP
+    size_t strlen_c(const char *str) {
+        if (!str || !*str)
+            return -1;
+        size_t len = 0;
+        while (*str++) ++len;
+        return len;
+    }
+    char *strcpy_c(char *dst, const char *src) {
+        if (!dst || !src)
+            return nullptr;
+        char *org = dst;
+        while (*src)
+            *dst++ = *src++;
+        *dst = 0;
+        return org;
+    }
+    bool endswith(const char *str, const char *with) {
+        if (!str || !with)
+            return false;
+        uint64_t _slen = strlen_c(str);
+        uint64_t _wlen = strlen_c(with);
+        if (_wlen > _slen)
+            return false;
+        str += _slen - _wlen;
+        while (*str)
+            if (*str++ != *with++)
+                return false;
+        return true;
+    }
+#endif
     [[nodiscard]] std::vector<std::string> *find_files(const char *dirpath,
                                                        const char *extension,
                                                        bool prep_dpath) {
@@ -62,6 +118,9 @@ namespace gtd {
             error += "\".\n";
             throw std::ios_base::failure{error};
         }
+        char cwd[PATH_MAX];
+        getcwd(cwd, PATH_MAX);
+        chdir(dirpath);
         struct dirent *entry{};
         struct stat buff{};
         if (!ptr)
@@ -98,6 +157,7 @@ namespace gtd {
                 }
             }
         }
+        chdir(cwd);
         return ptr;
     }
 }

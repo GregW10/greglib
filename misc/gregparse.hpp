@@ -7,45 +7,9 @@
 #include <sstream>
 #include <string>
 #include <regex>
+#include "gregmisc.hpp"
 
 namespace gtd {
-    bool str_eq(const char *s1, const char *s2) {
-        if (!s1 || !s2)
-            return false;
-        while (*s1 || *s2)
-            if (*s1++ != *s2++)
-                return false;
-        return true;
-    }
-#ifndef GREGALG_HPP
-    bool memcopy(void *dst, const void *src, size_t bytes) {
-        if (!bytes || !dst || !src)
-            return false;
-        char *cdst = (char*) dst;
-        const char *csrc = (char*) src;
-        while (bytes --> 0)
-            *cdst++ = *csrc++;
-        return true;
-    }
-#endif
-#ifndef GREGSTR_HPP
-    size_t strlen_c(const char *str) {
-        if (!str || !*str)
-            return -1;
-        size_t len = 0;
-        while (*str++) ++len;
-        return len;
-    }
-    char *strcpy_c(char *dst, const char *src) {
-        if (!dst || !src)
-            return nullptr;
-        char *org = dst;
-        while (*src)
-            *dst++ = *src++;
-        *dst = 0;
-        return org;
-    }
-#endif
     class duplicate_error : public std::invalid_argument {
     public:
         duplicate_error() : std::invalid_argument{"Error: duplicate flags/arguments found.\n"} {}

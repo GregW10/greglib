@@ -313,7 +313,7 @@ namespace gml {
         if (*(m1._shape._s + 1) != _c) // case for undefined matrix multiplication
             throw exceptions::matmul_error{m1._shape, m2._shape};
         uint64_t _volume = _n*_m;
-        mulComT<U, V> *pdata = new mulComT<U, V>[_volume];
+        mulComT<U, V> *pdata = new mulComT<U, V>[_volume]{};
         mulComT<U, V> *dptr = pdata;
         U *dpm1 = m1.data;
         U *m1_inner{};
