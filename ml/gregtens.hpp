@@ -660,6 +660,52 @@ namespace gml {
         const tensor_shape &shape() const noexcept {
             return this->_shape;
         }
+        T &max() {
+            if (!this->vol)
+                throw exceptions::tensor_error{"Error: max() cannot be called on an empty tensor.\n"};
+            T *ptr = this->data + 1;
+            T *mptr = this->data;
+            T _max = *mptr;
+            uint64_t counter = this->vol - 1;
+            while (counter --> 0) {
+                if (*ptr > _max)
+                    _max = *(mptr = ptr);
+                ++ptr;
+            }
+            return *mptr;
+        }
+        T &min() {
+            if (!this->vol)
+                throw exceptions::tensor_error{"Error: min() cannot be called on an empty tensor.\n"};
+            T *ptr = this->data + 1;
+            T *mptr = this->data;
+            T _min = *mptr;
+            uint64_t counter = this->vol - 1;
+            while (counter --> 0) {
+                if (*ptr < _min)
+                    _min = *(mptr = ptr);
+                ++ptr;
+            }
+            return *mptr;
+        }
+        T fold(T accum, void (*func)(const T &acc_val, const T &tens_val)) const {
+            if (!this->vol)
+                return accum;
+            T *ptr = this->data;
+            uint64_t counter = this->vol;
+            while (counter --> 0)
+                accum = func(accum, *ptr++);
+            return accum;
+        }
+        T fold(T accum, void (*func)(T &acc_val, const T &tens_val)) const {
+            if (!this->vol)
+                return accum;
+            T *ptr = this->data;
+            uint64_t counter = this->vol;
+            while (counter --> 0)
+                func(accum, *ptr++);
+            return accum;
+        }
         void to_zeros() noexcept { // set all elements to zero
             uint64_t counter = this->vol;
             T *ptr = this->data;

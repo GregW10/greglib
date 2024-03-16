@@ -9,6 +9,10 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <limits.h>
+#include <cerrno>
+#include <cstring>
+#include <cstdlib>
+#include <memory>
 
 /* C++ header file containing miscellaneous function definitions. */
 
@@ -109,30 +113,73 @@ namespace gtd {
                                          std::vector<std::string> *ptr = nullptr) {
         /* Recursive version of the above function. Finds all files within a given directory and all its subdirectories
          * with the given extension. Always prepends the dir. path, given the recursive traversal of the dir. tree. */
+        /* Not thread-safe due to the use of `strerror`, and could also cause problems due to changing the CWD. */
         if (!dirpath)
             throw std::invalid_argument{"Error: path to directory cannot be nullptr.\n"};
-        DIR *dir;
-        if (!(dir = opendir(dirpath))) {
-            std::string error = "Error: could not open directory \"";
-            error += dirpath;
-            error += "\".\n";
+        if (!*dirpath)
+            throw std::invalid_argument{"Error: path to directory cannot be an empty string.\n"};
+        char cwd[PATH_MAX];
+        if (!getcwd(cwd, PATH_MAX)) {
+            std::string error = "Error: could not obtain current working directory.\nReason: ";
+            error += strerror(errno);
+            error.push_back('\n');
             throw std::ios_base::failure{error};
         }
-        char cwd[PATH_MAX];
-        getcwd(cwd, PATH_MAX);
-        chdir(dirpath);
+        std::unique_ptr<char[]> _new_dpath{};
+        if (*dirpath == '.' && *(dirpath + 1) == 0)
+            dirpath = cwd;
+        else {
+            _new_dpath.reset(new char[PATH_MAX]);
+            if (!realpath(dirpath, _new_dpath.get())) {
+                _new_dpath.reset();
+                std::string error = "Error: could not obtain the fully-expanded path for \"";
+                error += dirpath;
+                error += "\".\nReason: ";
+                error += strerror(errno);
+                error.push_back('\n');
+                throw std::ios_base::failure{error};
+            }
+            dirpath = _new_dpath.get();
+        }
+        if (chdir(dirpath) == -1) {
+            std::string error = "Error: the current working directory could not be changed to \"";
+            error += dirpath;
+            error += "\".\nCurrent working directory: \"";
+            error += cwd;
+            error += "\"\nReason: ";
+            error += strerror(errno);
+            error.push_back('\n');
+            throw std::ios_base::failure{error};
+        }
+        DIR *dir;
+        if (!(dir = opendir("." /* dirpath */))) {
+            std::string error = "Error: could not open directory \"";
+            error += dirpath;
+            error += "\".\nCurrent working directory: \"";
+            error += cwd;
+            error += "\"\nReason: ";
+            error += strerror(errno);
+            error.push_back('\n');
+            throw std::ios_base::failure{error};
+        }
         struct dirent *entry{};
         struct stat buff{};
         if (!ptr)
             ptr = new std::vector<std::string>{};
-        if (*(dirpath + strlen_c(dirpath) - 1) == '/') {
+        uint64_t _dlen;
+        std::unique_ptr<char[]> _sub_dpath{};
+        if (*(dirpath + (_dlen = strlen_c(dirpath)) - 1) == '/') {
             while ((entry = readdir(dir))) {
                 if (str_eq(entry->d_name, ".") || str_eq(entry->d_name, ".."))
                     continue;
                 if (stat(entry->d_name, &buff) == -1) // ignore
                     continue;
                 if (S_ISDIR(buff.st_mode)) {
-                    find_files(entry->d_name, extension, ptr);
+                    _sub_dpath.reset(new char[_dlen + strlen_c(entry->d_name) + 1]);
+                    strcpy_c(_sub_dpath.get(), dirpath);
+                    strcpy_c(_sub_dpath.get() + _dlen, entry->d_name);
+                    find_files(_sub_dpath.get(), extension, ptr);
+                    _sub_dpath.reset();
                     continue;
                 }
                 if (endswith(entry->d_name, extension)) {
@@ -147,7 +194,12 @@ namespace gtd {
                 if (stat(entry->d_name, &buff) == -1)
                     continue;
                 if (S_ISDIR(buff.st_mode)) {
-                    find_files(entry->d_name, extension, ptr);
+                    _sub_dpath.reset(new char[_dlen + strlen_c(entry->d_name) + 2]);
+                    strcpy_c(_sub_dpath.get(), dirpath);
+                    *(_sub_dpath.get() + _dlen) = '/';
+                    strcpy_c(_sub_dpath.get() + _dlen + 1, entry->d_name);
+                    find_files(_sub_dpath.get(), extension, ptr);
+                    _sub_dpath.reset();
                     continue;
                 }
                 if (endswith(entry->d_name, extension)) {
@@ -157,7 +209,16 @@ namespace gtd {
                 }
             }
         }
-        chdir(cwd);
+        closedir(dir);
+        _new_dpath.reset();
+        if (chdir(cwd) == -1) {
+            std::string error = "Error: the current working directory could not be changed back to \"";
+            error += cwd;
+            error += "\".\nReason: ";
+            error += strerror(errno);
+            error.push_back('\n');
+            throw std::ios_base::failure{error};
+        }
         return ptr;
     }
 }

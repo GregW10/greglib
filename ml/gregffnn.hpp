@@ -598,13 +598,14 @@ namespace gml {
                 _tot_params += _layer.wvol + _layer.DN;
             return 12 + this->layers.size()*sizeof(ichunk_t) + sizeof(T)*_tot_params;
         }
-        std::ofstream::pos_type to_nnw() const {
-            char *path = gen::now_str("NN_weights_", ".nnw");
-            std::ofstream::pos_type _pos = this->to_nnw(path);
-            delete [] path;
-            return _pos;
+        [[nodiscard("Returns pointer to dynamically allocated memory.\n")]] char* to_nnw() const {
+            std::unique_ptr<char[]> _uptr{gen::now_str("NN_weights_", ".nnw")}; // in case exception is thrown below
+            this->to_nnw(_uptr.get());
+            // delete [] path;
+            // return _pos;
+            return _uptr.release(); // releases ownership and returns pointer to path, caller must free the memory
         }
-        std::ofstream::pos_type to_nnw(const char *path) const {
+        const char* to_nnw(const char *path) const {
             /* Writes the entire network's weights, biases and activation function IDs to a .nnw file. */
             if (!path)
                 throw std::invalid_argument{"Error: path to .nnw passed cannot be nullptr.\n"};
@@ -615,9 +616,10 @@ namespace gml {
             _hdr._numl = this->layers.size();
             out.write((char *) &_hdr, sizeof(nnw_header));
             if (!_hdr._numl) {
-                std::ofstream::pos_type _pos = out.tellp();
+                // std::ofstream::pos_type _pos = out.tellp();
                 out.close();
-                return _pos; // not much point in writing an empty .nnw file, but I don't see any reason to prohibit it
+                // return _pos; // not much point in writing an empty .nnw file, but I don't see any reason to prohibit it
+                return path;
             }
             ichunk_t *_ichunks = new ichunk_t[_hdr._numl]; // have chosen to allocate to avoid more I/O calls
             ichunk_t *iptr = _ichunks;
@@ -641,9 +643,10 @@ namespace gml {
                 out.write((char *) _layer.W.data, _layer.wvol*sizeof(T)); // write layer weights
                 out.write((char *) _layer._b.data, _layer.DN*sizeof(T)); // write layer biases
             }
-            std::ofstream::pos_type _pos = out.tellp();
+            // std::ofstream::pos_type _pos = out.tellp();
             out.close();
-            return _pos;
+            // return _pos;
+            return path;
         }
         const layer &operator[](uint64_t index) const {
             return this->layers[index];
