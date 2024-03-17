@@ -212,7 +212,11 @@ namespace gml {
             std::streamoff _off = static_cast<std::streamoff>(oss.tellp());
             char *_str = new char[_off + 1];
             // strcpy_c(_str, oss.rdbuf()->view().data());
+#ifndef __APPLE__
             memcopy(_str, oss.rdbuf()->view().data(), sizeof(char), _off);
+#else
+            memcopy(_str, oss.str().c_str(), sizeof(char), _off); // solution until Apple updates its clang++ compiler
+#endif
             *(_str + _off) = 0;
             return _str;
         }
@@ -227,7 +231,11 @@ namespace gml {
             std::streamoff _off = static_cast<std::streamoff>(oss.tellp());
             char *_str = new char[_off + 1];
             // strcpy_c(_str, oss.rdbuf()->view().data());
+#ifndef __APPLE__
             memcopy(_str, oss.rdbuf()->view().data(), sizeof(char), _off);
+#else
+            memcopy(_str, oss.str().c_str(), sizeof(char), _off);
+#endif
             *(_str + _off) = 0;
             return _str;
         }

@@ -14,9 +14,14 @@ namespace gml {
                 std::ostringstream oss;
                 oss << "Error: matrix with shape " << s1 << " cannot be multiplied by matrix with shape " << s2
                     << ". The number of columns of the first matrix must equal the number of rows of the second.\n";
+#ifndef __APPLE__
                 std::basic_string_view view = oss.view();
                 _msg = new char[view.size() + 1];
                 gml::gen::strcpy_c(_msg, view.data());
+#else
+                _msg = new char[static_cast<std::streamsize>(oss.tellp()) + 1];
+                gml::gen::strcpy_c(_msg, oss.str().c_str()); // temporary solution until Apple fixes clang
+#endif
             }
             const char *what() const noexcept override {
                 if (_msg)

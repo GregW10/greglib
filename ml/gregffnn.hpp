@@ -446,8 +446,8 @@ namespace gml {
             in.close();
         }
     public:
-        using ichunk_t = layer::info_chunk;
-        using lchunk_t = layer::layer_chunk;
+        using ichunk_t = typename layer::info_chunk;
+        using lchunk_t = typename layer::layer_chunk;
 #pragma pack(push, 1)
         struct nnw_header {
             const char hd[3] = {'N', 'N', 'W'};

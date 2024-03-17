@@ -126,7 +126,7 @@ namespace gtd {
             throw std::ios_base::failure{error};
         }
         std::unique_ptr<char[]> _new_dpath{};
-        if (*dirpath == '.' && *(dirpath + 1) == 0)
+        if (*dirpath == '.' && !*(dirpath + 1))
             dirpath = cwd;
         else {
             _new_dpath.reset(new char[PATH_MAX]);
