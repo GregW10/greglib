@@ -214,10 +214,10 @@ namespace gml {
             // strcpy_c(_str, oss.rdbuf()->view().data());
 #ifndef __APPLE__
             memcopy(_str, oss.rdbuf()->view().data(), sizeof(char), _off);
-#else
-            memcopy(_str, oss.str().c_str(), sizeof(char), _off); // solution until Apple updates its clang++ compiler
-#endif
             *(_str + _off) = 0;
+#else
+            strcpy_c(_str, oss.str().c_str());//,sizeof(char),_off+1);//solution until Apple updates its clang compiler
+#endif
             return _str;
         }
         [[nodiscard("Returns dynamically allocated memory.\n")]] char *now_str(const char *prefix, const char *suffix) {
@@ -233,10 +233,10 @@ namespace gml {
             // strcpy_c(_str, oss.rdbuf()->view().data());
 #ifndef __APPLE__
             memcopy(_str, oss.rdbuf()->view().data(), sizeof(char), _off);
-#else
-            memcopy(_str, oss.str().c_str(), sizeof(char), _off);
-#endif
             *(_str + _off) = 0;
+#else
+            strcpy_c(_str, oss.str().c_str());//,sizeof(char),_off+1);//solution until Apple updates its clang compiler
+#endif
             return _str;
         }
     }

@@ -20,6 +20,14 @@ namespace gml {
             explicit invalid_nnw_format(const char *msg) : std::logic_error{msg} {}
         };
     }
+    template <Numeric T>
+    using af_t = void (*)(T&);
+    template <Numeric T>
+    using afd_t = void (*)(T&);
+    template <Numeric T, Numeric U>
+    using lf_t = std::pair<T, vector<T>> (*)(const vector<U>&, const vector<T>&); // type for loss func. with grad.
+    template <Numeric T, Numeric U>
+    using lfng_t = T (*)(const vector<U>&, const vector<T>&); // type for loss func. without grad.
     namespace activations {
         template <Numeric T>
         void sigmoid(T &val) { // logistic sigmoid
@@ -45,13 +53,13 @@ namespace gml {
             val = val/(1 + sqrtl(val < 0 ? -val : val)); // my own invention
         }
         template <Numeric T>
-        std::pair<void (*)(T&), void (*)(T&)> get_func_by_id(uint32_t _id) {
+        std::pair<void (*)(T&), void (*)(T&)> get_funcs_by_id(uint32_t _id) {
             /* Returns the activation function and its derivative with ID `_id`, throws exception if it doesn't exist.*/
             /* An activation function and its derivative are assigned the same ID, as they are always used together. */
             static const std::map<uint32_t, std::pair<void (*)(T&), void (*)(T&)>> _funcs = {
                     {0, {nullptr, nullptr}}, // an ID of zero means no activation function
-                    {1, {sigmoid<T>, sigmoid_d<T>}},
-                    {2, {softsign<T>, softsign_d<T>}}
+                    {1, {&sigmoid<T>, &sigmoid_d<T>}},
+                    {2, {&softsign<T>, &softsign_d<T>}}
             };
             return _funcs.at(_id);
         }
@@ -60,8 +68,8 @@ namespace gml {
             /* Returns the ID of activation function `_f`. */
             static const std::map<void (*)(T&), uint32_t> _funcs = {
                     {nullptr, 0},
-                    {sigmoid<T>, 1},
-                    {softsign<T>, 2}
+                    {&sigmoid<T>, 1},
+                    {&softsign<T>, 2}
             };
             return _funcs.at(_f);
         }
@@ -70,18 +78,47 @@ namespace gml {
             /* Returns the ID of the activation function derivative `_f`. */
             static const std::map<void (*)(T&), uint32_t> _funcs = {
                     {nullptr, 0},
-                    {sigmoid_d<T>, 1},
-                    {softsign_d<T>, 2}
+                    {&sigmoid_d<T>, 1},
+                    {&softsign_d<T>, 2}
             };
             return _funcs.at(_f);
         }
     }
     namespace losses {
-        template <Numeric T, Numeric U/*,bool WithGrad = true*/> requires (std::is_convertible<subComT<T, U>, T>::value)
+        template <Numeric T, Numeric U> requires (std::is_convertible<subComT<T, U>, T>::value)
         std::pair<T, vector<T>> sqloss(const vector<U> &_y, const vector<T> &_f) {
             /* Square loss. Returns the loss itself and the derivative of the loss w.r.t. output vector `_f`. */
             vector<T> diff = _f - _y; // this way round because of also returning derivative of loss
             return {diff.mag_sq(), 2*diff};
+        }
+        template <Numeric T, Numeric U> requires (std::is_convertible<subComT<T, U>, T>::value)
+        T sqloss_ng(const vector<U> &_y, const vector<T> &_f) {
+            /* Square loss. Returns only the loss itself. */
+            return static_cast<T>((_y - _f).mag_sq());
+        }
+        template <Numeric T, Numeric U>
+        std::pair<lf_t<T, U>, lfng_t<T, U>> get_funcs_by_id(uint32_t _id) {
+            /* Returns the loss function and its non-grad. counterpart with ID `_id`, throws if it doesn't exist.*/
+            static const std::map<uint32_t, std::pair<lf_t<T, U>, lfng_t<T, U>>> _funcs = {
+                    {1, {&sqloss<T, U>, &sqloss_ng<T, U>}},
+            }; // no ID of zero corresponding to `nullptr` because an NN must have a loss function
+            return _funcs.at(_id);
+        }
+        template <Numeric T, Numeric U>
+        uint32_t get_id_by_func(lf_t<T, U> _f) {
+            /* Returns the ID of loss function `_f`. */
+            static const std::map<lf_t<T, U>, uint32_t> _funcs = {
+                    {&sqloss<T, U>, 1},
+            };
+            return _funcs.at(_f);
+        }
+        template <Numeric T, Numeric U>
+        uint32_t get_id_by_ngfunc(lfng_t<T, U> _f) {
+            /* Returns the ID of the non-grad. loss function `_f`. */
+            static const std::map<lfng_t<T, U>, uint32_t> _funcs = {
+                    {&sqloss_ng<T, U>, 1},
+            };
+            return _funcs.at(_f);
         }
         // template <Numeric T, Numeric U> requires (std::is_convertible<subComT<T, U>, T>::value)
         // T sqloss<T, U, false>(const vector<U> &_y, const vector<T> &_f) {
@@ -133,7 +170,7 @@ namespace gml {
             DN{*_sW}, DNm1{*(_sW + 1)}, W{_dataW, rankW, _sW, _volumeW, copy_shapeW},
             _b{_data_b, rank_b, _s_b, _volume_b, copy_shape_b, true} {
                 try {
-                    auto [f1, f2] = activations::get_func_by_id<T>(_actfunc_id);
+                    auto [f1, f2] = activations::get_funcs_by_id<T>(_actfunc_id);
                     _sigma = f1;
                     _sigmap = f2;
                 } catch(const std::out_of_range&) {/* `_sigma` and `_sigmap` already `nullptr`, no action required */}
@@ -210,7 +247,7 @@ namespace gml {
             DN{*_ch._sW}, DNm1{*(_ch._sW + 1)}, W{_ch._dataW, _ch.rankW, _ch._sW, _ch._volumeW, _ch.copy_shapeW},
             _b{_ch._data_b, _ch.rank_b, _ch._s_b, _ch._volume_b, _ch.copy_shape_b, true} {
                 try {
-                    auto [f1, f2] = activations::get_func_by_id<T>(_ch._actfunc_id);
+                    auto [f1, f2] = activations::get_funcs_by_id<T>(_ch._actfunc_id);
                     _sigma = f1;
                     _sigmap = f2;
                 } catch(const std::out_of_range&) {/* `_sigma` and `_sigmap` already `nullptr`, no action required */}
@@ -362,13 +399,18 @@ namespace gml {
         using ctorh_t = typename layer::ctor_helper;
     private:
         std::deque<layer> layers{};
-        std::pair<T, vector<T>> (*_lossf)(const vector<T>&, const vector<T>&) = losses::sqloss<T, T>;
+        lf_t<T, T> _lossf = &losses::sqloss<T, T>; // loss function with gradient
+        lfng_t<T, T> _lossf_ng = &losses::sqloss_ng<T, T>; // loss function without gradient
         T _loss{}; // cumulative loss
         vector<T> _foutput{}; // to store the final output of the network after a forward pass
         uint64_t _bsize = 0; // counter for number of forwards/backwards passes performed ( == num. batches)
         bool fpassed = false;
         // bool bpassed = false;
         void load_nnw(const char *path) {
+            /* Loads the neural network from a .nnw file. Loss function is set to `sq_loss` if the "unknown" loss
+             * function ID (4294967295) is encountered (as not having any loss function would be UB given the
+             * dereferencing that occurs when it is used) - if any other non-existent ID is encountered, an exception is
+             * thrown. */
             struct stat buff{};
             if (stat(path, &buff) == -1)
                 throw std::ios_base::failure{"Error: could not obtain .nnw file info.\n"};
@@ -386,6 +428,21 @@ namespace gml {
             if (_hdr._sizeof_T != sizeof(T))
                 throw exceptions::invalid_nnw_format{"Error: invalid .nnw format - reported \"sizeof(T)\" does not "
                                                      "match actual \"sizeof(T)\".\n"};
+            if (_hdr._lid == ((uint32_t) -1)) { // maybe set errno here
+                this->_lossf = &losses::sqloss<T, T>;
+                this->_lossf_ng = &losses::sqloss_ng<T, T>;
+            } else {
+                try {
+                    auto [_lf1, _lf2] = losses::get_funcs_by_id<T, T>(_hdr._lid);
+                    this->_lossf = _lf1;
+                    this->_lossf_ng = _lf2;
+                } catch (const std::out_of_range&) {
+                    std::string error = "Error: no loss function with ID ";
+                    error += std::to_string(_hdr._lid);
+                    error += " found.\n";
+                    throw exceptions::invalid_nnw_format{error.c_str()};
+                }
+            }
             if (!_hdr._numl) {
                 if (buff.st_size > sizeof(nnw_header))
                     throw exceptions::invalid_nnw_format{"Error: invalid .nnw format - file too large for storing "
@@ -452,15 +509,19 @@ namespace gml {
         struct nnw_header {
             const char hd[3] = {'N', 'N', 'W'};
             const unsigned char _sizeof_T = sizeof(T);
+            uint32_t _lid{}; // ID of loss function
             uint64_t _numl{}; // number of layers
         };
 #pragma pack(pop)
         using deq_size_t = typename std::deque<layer>::size_type;
         ffnn() = default;
-        explicit ffnn(std::pair<T, vector<T>> (*loss_function)(const vector<T>&, const vector<T>&)) {
+        explicit ffnn(lf_t<T, T> loss_function, lfng_t<T, T> loss_function_ng) {
             if (!loss_function)
                 throw std::invalid_argument{"Error: loss function passed cannot be nullptr.\n"};
+            if (!loss_function_ng)
+                throw std::invalid_argument{"Error: the only-loss loss function passed cannot be nullptr.\n"};
             _lossf = loss_function;
+            _lossf_ng = loss_function_ng;
         }
         explicit ffnn(const char *nnw_path) {
             if (!nnw_path)
@@ -508,17 +569,18 @@ namespace gml {
             this->layers.emplace_back(std::move(_layer));
             return this->layers.back();
         } */
-        std::pair<T, vector<T>> (*loss_func())(const vector<T>&, const vector<T>&) {
-            return this->_lossf;
+        std::pair<lf_t<T, T>, lfng_t<T, T>> loss_funcs() {
+            return {this->_lossf, this->_lossf_ng};
         }
-        std::pair<T, vector<T>> (*loss_func(std::pair<T, vector<T>> (*_new_lossf)(const vector<T>&, const vector<T>&)))
-                                (const vector<T>&, const vector<T>&) {
+        std::pair<lf_t<T, T>, lfng_t<T, T>> loss_funcs(lf_t<T, T> _new_lossf, lfng_t<T, T> _new_lossf_ng) {
             /* Sets the loss function to `_new_lossf` and returns the previous loss function. */
-            if (!_new_lossf)
+            if (!_new_lossf || !_new_lossf_ng)
                 return nullptr;
-            auto _oldfunc = this->_lossf;
+            std::pair<lf_t<T, T>, lfng_t<T, T>> oldfuncs = {this->_lossf, this->_lossf_ng};
+            // auto _oldfunc = this->_lossf;
             this->_lossf = _new_lossf;
-            return _oldfunc;
+            this->_lossf_ng = _new_lossf_ng;
+            return oldfuncs;
         }
         deq_size_t num_layers() const noexcept {
             return this->layers.size();
@@ -583,7 +645,22 @@ namespace gml {
             // std::cout << "Retvec:\n" << retvec << std::endl;
             for (const layer &_layer : this->layers)
                 _layer.fprop_eval(retvec);
+            // I should either return the loss here or in another similar function
             return retvec;
+        }
+        // template <Numeric U>
+        T fpass_loss(const vector<T> &_input, const vector<T> &_y) const {
+            vector<T> _output = _input;
+            for (const layer &_layer : this->layers)
+                _layer.fprop_eval(_output);
+            return this->_lossf_ng(_y, _output);
+        }
+        // template <Numeric U>
+        std::pair<T, vector<T>> fpass_both(const vector<T> &_input, const vector<T> &_y) const {
+            vector<T> _output = _input;
+            for (const layer &_layer : this->layers)
+                _layer.fprop_eval(_output);
+            return this->_lossf(_y, _output);
         }
         typename std::deque<layer>::const_iterator begin() const {
             return this->layers.begin();
@@ -596,7 +673,7 @@ namespace gml {
             uint64_t _tot_params = 0;
             for (const layer &_layer : this->layers)
                 _tot_params += _layer.wvol + _layer.DN;
-            return 12 + this->layers.size()*sizeof(ichunk_t) + sizeof(T)*_tot_params;
+            return 16 + this->layers.size()*sizeof(ichunk_t) + sizeof(T)*_tot_params;
         }
         [[nodiscard("Returns pointer to dynamically allocated memory.\n")]] char* to_nnw() const {
             std::unique_ptr<char[]> _uptr{gen::now_str("NN_weights_", ".nnw")}; // in case exception is thrown below
@@ -613,6 +690,11 @@ namespace gml {
             if (!out.good())
                 throw std::ios_base::failure{"Error: could not open .nnw file.\n"};
             nnw_header _hdr;
+            try {
+                _hdr._lid = losses::get_id_by_func(this->_lossf);
+            } catch (const std::out_of_range&) {
+                _hdr._lid = -1;
+            }
             _hdr._numl = this->layers.size();
             out.write((char *) &_hdr, sizeof(nnw_header));
             if (!_hdr._numl) {

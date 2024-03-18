@@ -16,11 +16,13 @@ namespace gml {
                     << ". The number of columns of the first matrix must equal the number of rows of the second.\n";
 #ifndef __APPLE__
                 std::basic_string_view view = oss.view();
-                _msg = new char[view.size() + 1];
-                gml::gen::strcpy_c(_msg, view.data());
+                std::basic_string_view::size_type _size = view.size();
+                _msg = new char[_size + 1];
+                gen::memcopy(_msg, view.data(), sizeof(char), _size); // string view not guaranteed to have null term.
+                *(_msg + _size) = 0;
 #else
                 _msg = new char[static_cast<std::streamsize>(oss.tellp()) + 1];
-                gml::gen::strcpy_c(_msg, oss.str().c_str()); // temporary solution until Apple fixes clang
+                gen::strcpy_c(_msg, oss.str().c_str()); // temporary solution until Apple fixes clang
 #endif
             }
             const char *what() const noexcept override {
@@ -28,7 +30,7 @@ namespace gml {
                     return _msg;
                 return tensor_error::what();
             }
-            ~matmul_error() {
+            ~matmul_error() override { // `std::exception` has a virtual destructor, thank god
                 delete [] _msg;
             }
         };
