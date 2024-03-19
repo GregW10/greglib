@@ -15,8 +15,8 @@ namespace gml {
                 oss << "Error: matrix with shape " << s1 << " cannot be multiplied by matrix with shape " << s2
                     << ". The number of columns of the first matrix must equal the number of rows of the second.\n";
 #ifndef __APPLE__
-                std::basic_string_view view = oss.view();
-                std::basic_string_view::size_type _size = view.size();
+                std::string_view view = oss.view();
+                typename std::string_view::size_type _size = view.size();
                 _msg = new char[_size + 1];
                 gen::memcopy(_msg, view.data(), sizeof(char), _size); // string view not guaranteed to have null term.
                 *(_msg + _size) = 0;
