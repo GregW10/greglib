@@ -53,13 +53,21 @@ namespace gml {
             val = val/(1 + sqrtl(val < 0 ? -val : val)); // my own invention
         }
         template <Numeric T>
+        void softroot_d(T &val) {
+            val = sqrtl(val < 0 ? -val : val);
+            // T _num = 2 + val;
+            val += 1;
+            val = (val + 1)/(2*val*val);
+        }
+        template <Numeric T>
         std::pair<void (*)(T&), void (*)(T&)> get_funcs_by_id(uint32_t _id) {
             /* Returns the activation function and its derivative with ID `_id`, throws exception if it doesn't exist.*/
             /* An activation function and its derivative are assigned the same ID, as they are always used together. */
             static const std::map<uint32_t, std::pair<void (*)(T&), void (*)(T&)>> _funcs = {
                     {0, {nullptr, nullptr}}, // an ID of zero means no activation function
                     {1, {&sigmoid<T>, &sigmoid_d<T>}},
-                    {2, {&softsign<T>, &softsign_d<T>}}
+                    {2, {&softsign<T>, &softsign_d<T>}},
+                    {3, {&softroot<T>, &softroot_d<T>}}
             };
             return _funcs.at(_id);
         }
@@ -69,7 +77,8 @@ namespace gml {
             static const std::map<void (*)(T&), uint32_t> _funcs = {
                     {nullptr, 0},
                     {&sigmoid<T>, 1},
-                    {&softsign<T>, 2}
+                    {&softsign<T>, 2},
+                    {&softroot<T>, 3}
             };
             return _funcs.at(_f);
         }
@@ -79,7 +88,8 @@ namespace gml {
             static const std::map<void (*)(T&), uint32_t> _funcs = {
                     {nullptr, 0},
                     {&sigmoid_d<T>, 1},
-                    {&softsign_d<T>, 2}
+                    {&softsign_d<T>, 2},
+                    {&softroot_d<T>, 3}
             };
             return _funcs.at(_f);
         }
