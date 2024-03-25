@@ -815,8 +815,12 @@ namespace gml {
             delete [] data;
         }
         virtual tensor<T> &operator+=(const tensor<T> &other) {
-            if (other._shape != this->_shape)
-                throw exceptions::dimension_mismatch_error{"Error: cannot sum two tensors with different shapes.\n"};
+            if (other._shape != this->_shape) {
+                std::ostringstream oss;
+                oss << "Error: cannot sum two tensors with different shapes.\nShape of *this: "
+                    << this->_shape << "\nShape of other: " << other << '\n';
+                throw exceptions::dimension_mismatch_error{oss.str().c_str()};
+            }
             T *dptr = this->data;
             T *optr = other.data;
             uint64_t counter = this->vol;
@@ -825,8 +829,12 @@ namespace gml {
             return *this;
         }
         virtual tensor<T> &operator-=(const tensor<T> &other) {
-            if (other._shape != this->_shape)
-                throw exceptions::dimension_mismatch_error{"Error: cannot subtract tensor with different shape.\n"};
+            if (other._shape != this->_shape) {
+                std::ostringstream oss;
+                oss << "Error: cannot subtract tensor with different shape.\nShape of *this: "
+                    << this->_shape << "\nShape of other: " << other << '\n';
+                throw exceptions::dimension_mismatch_error{oss.str().c_str()};
+            }
             T *dptr = this->data;
             T *optr = other.data;
             uint64_t counter = this->vol;
