@@ -1,39 +1,6 @@
 #include <iostream>
 #include "gregvct.hpp"
 
-template <typename T>
-class A {
-protected:
-    int x{};
-public:
-    A() = default;
-    A(int _x) : x{_x} {}
-    template <typename ...Args>
-    int get(Args ...args) {
-        if constexpr (!sizeof...(args))
-            return 0;
-        return (x + (args + ...));
-    }
-    void print(const char *str) const noexcept {
-        std::cout << str << ", " << x << std::endl;
-    }
-};
-
-template <typename T>
-class B : public A<T> {
-public:
-    B() = default;
-    B(int _x) : A<T>{_x} {}
-    using A<T>::get;
-    using A<T>::print;
-    int get(const std::initializer_list<T> &list) {
-        return A<T>::x;
-    }
-    void print(int a) {
-        std::cout << a << ", " << A<T>::x << std::endl;
-    }
-};
-
 int main() {
     gml::vector<long double> vec = {{1, 2, 3, 4, 5, 6}};
     std::cout << "vec:\n" << vec << std::endl;
@@ -49,48 +16,23 @@ int main() {
     std::cout << "vec2:\n" << vec2 << "\n---------\n" << std::endl;
     gml::matrix<long double> mat = {{5, 3, 2, 5, 3, 3, 1, 7, 3},
                                     {9, 8, 7, 6, 5, 4, 8, 2, 5},
-                                    {1, 1, 5, 2, 8, 2, 1, 7, 3},
+                                    {1, 12898, 5, 2, 8, 2, 1, 7, 3},
                                     {8, 5, 2, 3, 1, 2, 8, 9, 4},
-                                    {1, 2, 3, 4, 5, 6, 1, 7, 0},
+                                    {1, 2, 3, 4, 5, 6, 1, 7, -193829},
                                     {5, 8, 2, 4, 1, 9, 6, 0, 1}};
-    // std::cout << mat << "\nx\n" << vec << "\n=\n" << vec.apply(mat) << "\n--------\n" << std::endl;
-    std::cout << mat << "\nx\n" << vec2 << "\n=\n" << vec2.apply(mat) << "\n--------\n" << std::endl;
-    std::cout << vec2.transpose() << "\nx\n" << mat << "\n=\n" << vec2*mat << "\n--------\n" << std::endl;
-    std::cout << "vec: " << vec << "\n----------\n" << std::endl;
-    std::cout << vec.transpose() << "\nx\n" << vec2 << "\n=\n" << vec*vec2 << "\n-----------\n" << std::endl;
-    gml::matrix<long double> m;
-    m = std::move(mat);
-    std::cout << mat.shape() << std::endl;
-    gml::tensor<long double> tens = m;
-    std::cout << tens << std::endl;
-    tens = mat;
-    std::cout << tens << std::endl;
-    tens = m;
-    mat = tens;
-    std::cout << mat << std::endl;
-    mat = vec;
-    std::cout << mat << std::endl;
-    vec = mat;
-    std::cout << vec << std::endl;
-    std::cout << mat.at(1, 0) << std::endl;
-    std::cout << vec.at(1, 0) << std::endl;/* */
-    gml::vector<long double> cvec = {{4},
-                                     {3},
-                                     {9},
-                                     {9},
-                                     {7},
-                                     {2},
-                                     {1}};
-    std::cout << "cvec:\n" << cvec << std::endl;
-    std::cout << "cvec.copy().transpose():\n" << cvec.copy().transpose() << std::endl;
-    std::cout << "cvec:\n" << cvec << std::endl;
-    std::cout << "cvec.transpose():\n" << cvec.transpose() << std::endl;
-    std::cout << "cvec:\n" << cvec << std::endl;
-    std::cout << "cvec.copy().transpose():\n" << cvec.copy().transpose() << "\niscv: " << std::boolalpha << cvec.copy().transpose().is_colvec() << std::endl;
-    std::cout << "cvec:\n" << cvec << std::endl;
-    B<int> b;
-    // std::cout << b.get(2, 3) << std::endl;
-    b.print(4);
-    b.print("hi");
+    long double accum = 0;
+    auto sum = vec.fold(0, +[](long double &accum, const long double &val){accum += val;});
+    auto prod = vec.fold(1, +[](const long double &accum, const long double &val){return accum*val;});
+    std::cout << "Sum of\n" << vec << "\nis: " << sum << std::endl;
+    std::cout << "Prod. of\n" << vec << "\nis: " << prod << std::endl;
+    gml::vector<int> vint;
+    auto s = vint.fold(0, +[](int &accum, const int &val){accum += val;});
+    auto p = vint.fold(1, +[](const int &accum, const int &val){return accum + val;});
+    std::cout << "s: " << s << std::endl;
+    std::cout << "p: " << p << std::endl;
+    std::cout << "max of \n" << mat << "\n= " << mat.max() << std::endl;
+    std::cout << "min of \n" << mat << "\n= " << mat.min() << std::endl;
+    // auto x = vint.max();
+    auto y = vint.min();
     return 0;
 }

@@ -688,7 +688,7 @@ namespace gml {
             }
             return *mptr;
         }
-        T fold(T accum, void (*func)(const T &acc_val, const T &tens_val)) const {
+        T fold(T accum, T (*func)(const T &acc_val, const T &tens_val)) const {
             if (!this->vol)
                 return accum;
             T *ptr = this->data;
@@ -818,7 +818,7 @@ namespace gml {
             if (other._shape != this->_shape) {
                 std::ostringstream oss;
                 oss << "Error: cannot sum two tensors with different shapes.\nShape of *this: "
-                    << this->_shape << "\nShape of other: " << other << '\n';
+                    << this->_shape << "\nShape of other: " << other._shape << '\n';
                 throw exceptions::dimension_mismatch_error{oss.str().c_str()};
             }
             T *dptr = this->data;
@@ -832,7 +832,7 @@ namespace gml {
             if (other._shape != this->_shape) {
                 std::ostringstream oss;
                 oss << "Error: cannot subtract tensor with different shape.\nShape of *this: "
-                    << this->_shape << "\nShape of other: " << other << '\n';
+                    << this->_shape << "\nShape of other: " << other._shape << '\n';
                 throw exceptions::dimension_mismatch_error{oss.str().c_str()};
             }
             T *dptr = this->data;
