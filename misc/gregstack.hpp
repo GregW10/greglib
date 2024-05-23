@@ -23,7 +23,7 @@
 #define GLOBAL
 #endif
 
-#define DEF_STACK_SIZE 16
+#define DEF_STACK_SIZE 32
 
 namespace gtd {
 #ifdef __CUDACC__
@@ -52,9 +52,11 @@ namespace gtd {
     public:
 #ifndef __CUDACC__
         stack() : _data{new T[DEF_STACK_SIZE]}, _asize{DEF_STACK_SIZE}, _top{_data} {}
-        explicit stack(uint64_t size) : _data{new T[size]}, _asize{size}, _top{_data} {}
+        explicit stack(uint64_t size) : _data{size ? new T[size] : nullptr}, _asize{size}, _top{_data} {}
 #else
         __host__ __device__ explicit stack(uint64_t size = DEF_STACK_SIZE) : _asize{size} {
+            if (!size)
+                return;
             // cudaError_t err;
             // if ((err = cudaMalloc(&_data, _asize*sizeof(T))) != cudaSuccess) {
             //     std::string error = "Error: GPU memory could not be allocated because \"";
@@ -104,7 +106,7 @@ namespace gtd {
             return *_top++ = val;
         }
         HOST_DEVICE void pop() noexcept { // performs no checking whatsoever, must be done with caution
-            --_top->~T();
+            (--_top)->~T();
             --_size;
             // if (!_size)
             //     _top = nullptr;
@@ -121,6 +123,12 @@ namespace gtd {
             --_size;
             return val;
         }
+        //HOST_DEVICE bool reserve(uint64_t _nsize) {
+        //    if (_nsize < _asize)
+        //        return false;
+        //
+        //    return true;
+        // }
         HOST_DEVICE T &top() noexcept { // performs no checking
             return *(_top - 1);
         }
