@@ -68,7 +68,7 @@ namespace gtd {
             _top = _data;
         }
 #endif
-        HOST_DEVICE T &push(const T &val) {
+        HOST_DEVICE T &push(const T &val = T{}) {
             if (_size == _asize) {
                 if (!_asize) {
                     _data = new T[DEF_STACK_SIZE];
@@ -108,6 +108,10 @@ namespace gtd {
         HOST_DEVICE void pop() noexcept { // performs no checking whatsoever, must be done with caution
             (--_top)->~T();
             --_size;
+            // if (_top < _data) {
+            //     fprintf(stderr, "You done fucked up.\n");
+            //     abort();
+            // }
             // if (!_size)
             //     _top = nullptr;
         }
@@ -136,7 +140,7 @@ namespace gtd {
             return *(_top - 1);
         }
         HOST_DEVICE bool empty() const noexcept {
-            return _size;
+            return !_size;
         }
         HOST_DEVICE uint64_t size() const noexcept {
             return _size;
