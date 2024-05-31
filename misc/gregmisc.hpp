@@ -99,18 +99,41 @@ namespace gtd {
             val /= 10;
         }
     }
-    bool write_all(int fd, const char *buff, size_t count) {
+    uint64_t write_all(int fd, const void *buff, size_t count) {
         size_t bwritten;
         size_t rem = count;
-        const char *rembuff = buff;
+        const char *rembuff = (const char *) buff;
+        uint64_t tot_written = 0;
         while (rem) {
             if ((bwritten = write(fd, rembuff, rem)) == -1)
-                return false;
+                return tot_written;
+            tot_written += bwritten;
             rem -= bwritten;
             rembuff += bwritten;
-            printf("Written.\n");
         }
-        return true;
+        return tot_written;
+    }
+    uint64_t read_all(int fd, void *buff, size_t count = -1) {
+        size_t bread;
+        size_t rem = count;
+        char *rembuff = (char *) buff;
+        uint64_t tot_read = 0;
+        if (count == ((size_t) -1)) {
+            while ((bread = read(fd, rembuff, rem)) > 0) {
+                tot_read += bread;
+                rem -= bread;
+                rembuff += bread;
+            }
+        } else {
+            while (tot_read != count) {
+                if ((bread = read(fd, rembuff, rem)) > 0)
+                    return false;
+                tot_read += bread;
+                rem -= bread;
+                rembuff += bread;
+            }
+        }
+        return tot_read;
     }
     [[nodiscard]] std::vector<std::string> *find_files(const char *dirpath,
                                                        const char *extension,
