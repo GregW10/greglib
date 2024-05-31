@@ -13,6 +13,7 @@
 #include <cstring>
 #include <cstdlib>
 #include <memory>
+#include <cmath>
 
 /* C++ header file containing miscellaneous function definitions. */
 
@@ -55,6 +56,16 @@ namespace gtd {
         *dst = 0;
         return org;
     }
+    char *strcat_c(char *dst, const char *src) {
+        if (!dst || !src)
+            return nullptr;
+        char *org = dst;
+        while (*dst) ++dst;
+        while (*src)
+            *dst++ = *src++;
+        *dst = 0;
+        return org;
+    }
     bool endswith(const char *str, const char *with) {
         if (!str || !with)
             return false;
@@ -69,6 +80,38 @@ namespace gtd {
         return true;
     }
 #endif
+    template <std::integral T>
+    void to_string(T val, char *buffer) {
+        if (!val) {
+            *buffer++ = 48;
+            *buffer = 0;
+            return;
+        }
+        if (val < 0) {
+            *buffer++ = '-';
+            val *= -1;
+        }
+        uint64_t i = log10l(val);
+        while (i --> 0) ++buffer;
+        *(buffer + 1) = 0;
+        while (val > 0) {
+            *buffer-- = (val % 10) + 48;
+            val /= 10;
+        }
+    }
+    bool write_all(int fd, const char *buff, size_t count) {
+        size_t bwritten;
+        size_t rem = count;
+        const char *rembuff = buff;
+        while (rem) {
+            if ((bwritten = write(fd, rembuff, rem)) == -1)
+                return false;
+            rem -= bwritten;
+            rembuff += bwritten;
+            printf("Written.\n");
+        }
+        return true;
+    }
     [[nodiscard]] std::vector<std::string> *find_files(const char *dirpath,
                                                        const char *extension,
                                                        bool prep_dpath) {
