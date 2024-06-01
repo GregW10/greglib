@@ -126,8 +126,8 @@ namespace gtd {
             }
         } else {
             while (tot_read != count) {
-                if ((bread = read(fd, rembuff, rem)) > 0)
-                    return false;
+                if ((bread = read(fd, rembuff, rem)) <= 0)
+                    return tot_read;
                 tot_read += bread;
                 rem -= bread;
                 rembuff += bread;
