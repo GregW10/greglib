@@ -20,6 +20,13 @@
 #include <iostream>
 
 namespace gtd {
+    template <typename T>
+    concept numeric = requires (T a, T b) {
+        {a + b} -> std::same_as<T>;
+        {a + b} -> std::same_as<T>;
+        {a * b} -> std::same_as<T>;
+        {a / b} -> std::same_as<T>;
+    };
     bool str_eq(const char *s1, const char *s2) {
         if (!s1 || !s2)
             return false;
