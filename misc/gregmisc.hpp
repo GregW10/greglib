@@ -19,15 +19,36 @@
 
 #include <iostream>
 
+#ifdef __CUDACC__
+#warning "Compiling with nvcc.\n"
+#include "cuda_runtime.h"
+#define HOST_DEVICE __host__ __device__
+#define DEVICE __device__
+#define GLOBAL __global__
+#include "cuda_runtime.h"
+#define PI 3.14159265358979323846264338327950288419716939937510582097494459
+#define LIGHT_SPEED 299'792'458.0 // m/s
+#define PERMITTIVITY 0.0000000000088541878188 // F/m
+#define PERMEABILITY 0.00000125663706127 // F/m
+#else
+#define HOST_DEVICE
+#define DEVICE
+#define GLOBAL
+#define PI 3.14159265358979323846264338327950288419716939937510582097494459l
+#define LIGHT_SPEED 299'792'458.0l // m/s
+#define PERMITTIVITY 0.0000000000088541878188l // F/m
+#define PERMEABILITY 0.00000125663706127 // F/m
+#endif
+
 namespace gtd {
     template <typename T>
     concept numeric = requires (T a, T b) {
-        {a + b} -> std::same_as<T>;
-        {a + b} -> std::same_as<T>;
-        {a * b} -> std::same_as<T>;
-        {a / b} -> std::same_as<T>;
+        {a + b} -> std::convertible_to<T>;
+        {a + b} -> std::convertible_to<T>;
+        {a * b} -> std::convertible_to<T>;
+        {a / b} -> std::convertible_to<T>;
     };
-    bool str_eq(const char *s1, const char *s2) {
+    HOST_DEVICE bool str_eq(const char *s1, const char *s2) {
         if (!s1 || !s2)
             return false;
         while (*s1 || *s2)
@@ -36,7 +57,7 @@ namespace gtd {
         return true;
     }
 #ifndef GREGALG_HPP
-    bool memcopy(void *dst, const void *src, size_t bytes) {
+    HOST_DEVICE bool memcopy(void *dst, const void *src, size_t bytes) {
         if (!bytes || !dst || !src)
             return false;
         char *cdst = (char*) dst;
@@ -47,14 +68,14 @@ namespace gtd {
     }
 #endif
 #ifndef GREGSTR_HPP
-    size_t strlen_c(const char *str) {
+    HOST_DEVICE size_t strlen_c(const char *str) {
         if (!str || !*str)
             return -1;
         size_t len = 0;
         while (*str++) ++len;
         return len;
     }
-    char *strcpy_c(char *dst, const char *src) {
+    HOST_DEVICE char *strcpy_c(char *dst, const char *src) {
         if (!dst || !src)
             return nullptr;
         char *org = dst;
@@ -63,7 +84,7 @@ namespace gtd {
         *dst = 0;
         return org;
     }
-    char *strcat_c(char *dst, const char *src) {
+    HOST_DEVICE char *strcat_c(char *dst, const char *src) {
         if (!dst || !src)
             return nullptr;
         char *org = dst;
@@ -73,7 +94,7 @@ namespace gtd {
         *dst = 0;
         return org;
     }
-    bool endswith(const char *str, const char *with) {
+    HOST_DEVICE bool endswith(const char *str, const char *with) {
         if (!str || !with)
             return false;
         uint64_t _slen = strlen_c(str);
@@ -88,7 +109,7 @@ namespace gtd {
     }
 #endif
     template <std::integral T>
-    void to_string(T val, char *buffer) {
+    HOST_DEVICE void to_string(T val, char *buffer) {
         if (!val) {
             *buffer++ = 48;
             *buffer = 0;
@@ -293,6 +314,14 @@ namespace gtd {
             throw std::ios_base::failure{error};
         }
         return ptr;
+    }
+    template <numeric T>
+    HOST_DEVICE T rad_to_deg(const T &rad) {
+        return rad*180.0l/PI;
+    }
+    template <numeric T>
+    HOST_DEVICE T deg_to_rad(const T &deg) {
+        return deg*PI/180.0l;
     }
 }
 #endif

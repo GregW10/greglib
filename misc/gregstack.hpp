@@ -1,27 +1,13 @@
 #ifndef GREGSTACK_HPP
 #define GREGSTACK_HPP
 
+#include "gregmisc.hpp"
 #include <iostream>
 #include <cstdint>
 #include <cinttypes>
 #include <stdexcept>
 #include <string>
 #include <cassert>
-
-#ifdef __CUDACC__
-#warning "Compiling with nvcc.\n"
-#include "cuda_runtime.h"
-#define HOST_DEVICE __host__ __device__
-//#define HOST __host__
-#define DEVICE __device__
-#define GLOBAL __global__
-#include "cuda_runtime.h"
-#else
-#define HOST_DEVICE
-//#define HOST
-#define DEVICE
-#define GLOBAL
-#endif
 
 #define DEF_STACK_SIZE 32
 
