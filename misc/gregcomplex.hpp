@@ -5,6 +5,31 @@
 
 #include "gregmisc.hpp"
 
+namespace diff {
+    template <gtd::numeric T, gtd::numeric R, gtd::callret<T, R> F, bool = false>
+    HOST_DEVICE R simpquad(const F&,
+                           T,
+                           T,
+                           T abstol = 0.0625l/1024.0l,
+                           T reltol = 0.0625l/1024.0l,
+                           T ptol = 1/(1024.0l*1024.0l),
+                           uint64_t *mdepth = nullptr);
+    template <gtd::numeric T, gtd::numeric R, gtd::calldblret<T, R> F, gtd::callret<T> GH, bool = false>
+    HOST_DEVICE R simpdblquad(const F&,
+                              T,
+                              T,
+                              const GH&,
+                              const GH&,
+                              T abstol_y = 0.0625l/1024.0l,
+                              T reltol_y = 0.0625l/1024.0l,
+                              T ptol_y = 1/(1024.0l*1024.0l),
+                              uint64_t *mdepth_y = nullptr,
+                              T abstol_x = 0.0625l/1024.0l,
+                              T reltol_x = 0.0625l/1024.0l,
+                              T ptol_x = 1/(1024.0l*1024.0l),
+                              uint64_t *mdepth_x = nullptr);
+}
+
 namespace gtd {
     class invalid_complex_operation : public std::logic_error {
     public:
@@ -23,6 +48,7 @@ namespace gtd {
 	    HOST_DEVICE complex() = default;
         HOST_DEVICE complex(const T &_real_) : _real{_real_} {}
 	    HOST_DEVICE complex(const T &_real_, const T &_imag_) : _real{_real_}, _imag{_imag_} {}
+        HOST_DEVICE complex(const std::pair<T, T> &p) : _real{p.first}, _imag{p.second} {}
         HOST_DEVICE complex(const complex<T> &other) : _real{other._real}, _imag{other._imag} {}
         HOST_DEVICE complex(complex<T> &&other) : _real{std::move(other._real)}, _imag{std::move(other._imag)} {} // moving is almost certainly overkill
 	    HOST_DEVICE T real() const noexcept {
@@ -111,6 +137,16 @@ namespace gtd {
             this->_imag = std::move(other._imag);
             return *this;
         }
+        HOST_DEVICE complex<T> &operator=(const std::pair<T, T> &p) {
+            this->_real = p.first;
+            this->_imag = p.second;
+            return *this;
+        }
+        HOST_DEVICE complex<T> &operator=(std::pair<T, T> &&p) {
+            this->_real = std::move(p.first);
+            this->_imag = std::move(p.second);
+            return *this;
+        }
         HOST_DEVICE explicit operator T() {
             return this->_real;
         }
@@ -138,6 +174,10 @@ namespace gtd {
         HOST_DEVICE friend complex<T> operator*(const complex<T> &c1, const complex<T> &c2) {
             return {c1._real*c2._real - c1._imag*c2._imag, c1._real*c2._imag + c1._imag*c2._real};
         }
+        HOST_DEVICE friend complex<T> operator/(const complex<T> &c1, const complex<T> &c2) {
+            T denom = c2._real*c2._real + c2._imag*c2._imag;
+            return {(c1._real*c2._real + c1._imag*c2._imag)/denom, (c1._imag*c2._real - c1._real*c2._imag)/denom};
+        }
         friend std::ostream &operator<<(std::ostream &os, const complex<T> &c) {
 	        os << +c._real;
 	        if (c._imag >= 0)
@@ -146,6 +186,10 @@ namespace gtd {
 	    }
     	template <numeric U>
     	HOST_DEVICE friend U abs(const complex<U>&);
+        template <gtd::numeric U, gtd::numeric R, gtd::callret<U, R> F, bool>
+        HOST_DEVICE friend R diff::simpquad(const F&, U, U, U, U, U, uint64_t*);
+        template <gtd::numeric U, numeric R, calldblret<U, R> F, callret<U> GH, bool>
+        HOST_DEVICE friend R diff::simpdblquad(const F&, U, U, const GH&, const GH&, U, U, U, uint64_t*, U, U, U, uint64_t*);
     };
 	template <numeric T>
 	HOST_DEVICE T abs(const complex<T> &c) {

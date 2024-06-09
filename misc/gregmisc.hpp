@@ -50,6 +50,18 @@ namespace gtd {
         {a * b} -> std::convertible_to<T>;
         {a / b} -> std::convertible_to<T>;
     };
+    template <typename C>
+    concept callable = requires (C a) {
+        {a()};
+    };
+    template <typename C, typename T, typename R = T>
+    concept callret = requires (C a, T t) {
+        {a(t)} -> std::same_as<R>;
+    };
+    template <typename C, typename T, typename R = T>
+    concept calldblret = requires (C a, T t1, T t2) {
+        {a(t1, t2)} -> std::same_as<R>;
+    };
     HOST_DEVICE bool str_eq(const char *s1, const char *s2) {
         if (!s1 || !s2)
             return false;
