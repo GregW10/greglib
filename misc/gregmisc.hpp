@@ -325,5 +325,9 @@ namespace gtd {
     HOST_DEVICE T deg_to_rad(const T &deg) {
         return deg*PI/180.0l;
     }
+    template <numeric T>
+    HOST_DEVICE T abs(const T &x) {
+        return x >= 0 ? x : -x;
+    }
 }
 #endif

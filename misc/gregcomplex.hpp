@@ -144,6 +144,12 @@ namespace gtd {
 	            return os << " + " << +c._imag << "i";
 	        return os << " - " << -c._imag << "i";
 	    }
+    	template <numeric U>
+    	HOST_DEVICE friend U abs(const complex<U>&);
     };
+	template <numeric T>
+	HOST_DEVICE T abs(const complex<T> &c) {
+		return std::sqrt(c._real*c._real + c._imag*c._imag);
+	}
 }
 #endif
