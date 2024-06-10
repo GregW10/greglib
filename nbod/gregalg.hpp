@@ -35,12 +35,24 @@
 // I am aware the above two values are way past the max. precision of a long double, but having them to that many d.p.
 // makes me feel better
 
+#ifndef MILLION
 #define MILLION 1'000'000.0l
+#endif
+#ifndef BILLION
 #define BILLION 1'000'000'000.0l
+#endif
+#ifndef TRILLION
 #define TRILLION 1'000'000'000'000.0l
+#endif
+#ifndef QUADRILLION
 #define QUADRILLION 1'000'000'000'000'000.0l
+#endif
+#ifndef QUINTILLION
 #define QUINTILLION 1'000'000'000'000'000'000.0l
+#endif
+#ifndef SEXTILLION
 #define SEXTILLION 1'000'000'000'000'000'000'000.0l
+#endif
 
 #define MEAN_AVG(a, b) (((a) + (b))/2) // want to divide by 2.0l, but causes issues further down - must sort out
 
@@ -124,7 +136,9 @@ concept forwardIterator = requires (IT it, IT other) {
     {*it = *other};
     {it != other} -> std::same_as<bool>;
 };
+#ifndef PI
     constexpr long double PI = 3.14159265358979323846264338327950288419716939937510582097494459230l;
+#endif
     std::mutex g_mutex; // a global mutex which can be used in any function, in any thread, to avoid race conditions
     /* the below function, simple as it is, I find highly useful as it performs a byte-wise swap, and can, therefore,
      * be used on objects without touching any of their copy constructors */

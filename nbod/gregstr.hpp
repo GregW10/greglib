@@ -1784,7 +1784,7 @@ namespace gtd {
     String operator+(const std::string &str, const String &string) {
         return String{string}.append_front(str);
     }
-#ifndef GREGPARSE_HPP
+#if !defined(GREGPARSE_HPP) && !defined(GREGMISC_HPP)
     size_t strlen_c(const char *str) {
         if (str == nullptr)
             return 0;
@@ -1800,7 +1800,7 @@ namespace gtd {
             *(str + i) = ch;
         return str;
     }
-#ifndef GREGPARSE_HPP
+#if !defined(GREGPARSE_HPP) && !defined(GREGMISC_HPP)
     char *strcpy_c(char *dest, const char *source) {
         if (dest == nullptr || source == nullptr)
             return nullptr;
@@ -1809,6 +1809,7 @@ namespace gtd {
         return ptr;
     }
 #endif
+#ifndef GREGMISC_HPP
     char *strcat_c(char *_dest, const char *_src) {
         if (_dest == nullptr || _src == nullptr)
             return nullptr;
@@ -1819,6 +1820,7 @@ namespace gtd {
         while ((*ptr++ = *_src++));
         return _dest;
     }
+#endif
     int strcmp_c(const char *str1, const char *str2) {
         if (str1 == nullptr || str2 == nullptr)
             return -128;
