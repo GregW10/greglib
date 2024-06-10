@@ -72,9 +72,9 @@ concept isIntegral = std::is_integral<T>::value;
 // isNumWrapper is also used for the vector, vector2D and vector3D classes
 template <typename T> // any primitive type, or any class acting as a numerical wrapper type which implements...
 concept isNumWrapper = requires (T val, T val2, size_t l, long double f, std::ostream out) {
+    T{}; // default constructor
     T{1}; // ...a constructor which accepts numerical types
-    T{T{}}; // a constructor which accepts another type T, and a default (empty) constructor (should ideally construct
-    // an object corresponding to the number zero, or else numerous methods within matrix<T> do not make sense)
+    T{std::declval<T>()}; // a constructor which accepts another type T
     {val + val2} -> isConvertible<T>; // must be overloaded for addition onto itself
     {val + l} -> isConvertible<T>; // must be overloaded for addition onto integer type
     {l + val} -> isConvertible<T>; // ... and vice versa
@@ -354,6 +354,7 @@ concept forwardIterator = requires (IT it, IT other) {
         while (begin != end)
             *begin++ = value;
     }
+#ifndef GREGMISC_HPP
     inline long double rad_to_deg(const long double &radians) {
         return (radians*180)/PI;
     }
@@ -366,6 +367,7 @@ concept forwardIterator = requires (IT it, IT other) {
     inline long double deg_to_rad(const long double &&degrees) {
         return (degrees*PI)/180;
     }
+#endif
     template <isNumWrapper T>
     auto sqrt(const T& val, const T& epsilon = 0.00000001l) { // brute force
         if (val < 0)

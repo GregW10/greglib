@@ -29,7 +29,7 @@ namespace gtd {
     inline color operator*(const T &scalar, const color &col);
     template <isNumWrapper T>
     inline color operator*(const color &col, const T &scalar);
-    template <isNumWrapper T>
+    /* template <isNumWrapper T>
     inline color operator*(const T &&scalar, const color &col);
     template <isNumWrapper T>
     inline color operator*(const color &&col, const T &scalar);
@@ -40,7 +40,7 @@ namespace gtd {
     template <isNumWrapper T>
     inline color operator*(const T &&scalar, const color &&col);
     template <isNumWrapper T>
-    inline color operator*(const color &&col, const T &&scalar);
+    inline color operator*(const color &&col, const T &&scalar); */
     namespace colors {
         color black{0, 0, 0};
         color white{255, 255, 255};
@@ -868,7 +868,7 @@ namespace gtd {
     inline color operator*(const color &col, const T &scalar) {
         return {(unsigned char) (scalar*col.b), (unsigned char) (scalar*col.g), (unsigned char) (scalar*col.r)};
     }
-    template <isNumWrapper T>
+    /* template <isNumWrapper T>
     inline color operator*(const T &&scalar, const color &col) {
         return {(unsigned char) (scalar*col.b), (unsigned char) (scalar*col.g), (unsigned char) (scalar*col.r)};
     }
@@ -891,7 +891,7 @@ namespace gtd {
     template <isNumWrapper T>
     inline color operator*(const color &&col, const T &&scalar) {
         return {(unsigned char) (scalar*col.b), (unsigned char) (scalar*col.g), (unsigned char) (scalar*col.r)};
-    }
+    } */
     inline std::ostream &operator<<(std::ostream &os, const color &col) {
         return os << "[gtd::color@" << &col << ":r=" << +col.r << ",g=" << +col.g << ",b=" << +col.b << ']';
     }
