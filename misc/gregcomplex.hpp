@@ -45,11 +45,15 @@ namespace gtd {
         T _real{};
 	    T _imag{};
     public:
-	    HOST_DEVICE complex() = default;
-        HOST_DEVICE complex(const T &_real_) : _real{_real_} {}
-	    HOST_DEVICE complex(const T &_real_, const T &_imag_) : _real{_real_}, _imag{_imag_} {}
-        HOST_DEVICE complex(const std::pair<T, T> &p) : _real{p.first}, _imag{p.second} {}
-        HOST_DEVICE complex(const complex<T> &other) : _real{other._real}, _imag{other._imag} {}
+        const static inline gtd::complex<T> one{1};
+        const static inline gtd::complex<T> m_one{-1};
+        const static inline gtd::complex<T> imunit{0, 1};
+        const static inline gtd::complex<T> m_imunit{0, -1};
+	    HOST_DEVICE constexpr complex() = default;
+        HOST_DEVICE constexpr complex(const T &_real_) : _real{_real_} {}
+	    HOST_DEVICE constexpr complex(const T &_real_, const T &_imag_) : _real{_real_}, _imag{_imag_} {}
+        HOST_DEVICE constexpr complex(const std::pair<T, T> &p) : _real{p.first}, _imag{p.second} {}
+        HOST_DEVICE constexpr complex(const complex<T> &other) : _real{other._real}, _imag{other._imag} {}
         HOST_DEVICE complex(complex<T> &&other) : _real{std::move(other._real)}, _imag{std::move(other._imag)} {} // moving is almost certainly overkill
 	    HOST_DEVICE T real() const noexcept {
             return this->_real;
