@@ -5,30 +5,32 @@
 
 #include "gregmisc.hpp"
 
+#ifndef GREGSTACK_HPP
 namespace diff {
     template <gtd::numeric T, gtd::numeric R, gtd::callret<T, R> F, bool = false>
     HOST_DEVICE R simpquad(const F&,
                            T,
                            T,
-                           T abstol = 0.0625l/1024.0l,
-                           T reltol = 0.0625l/1024.0l,
-                           T ptol = 1/(1024.0l*1024.0l),
-                           uint64_t *mdepth = nullptr);
+                           T = 0.0625l/1024.0l,
+                           T = 0.0625l/1024.0l,
+                           T = 1/(1024.0l*1024.0l),
+                           uint64_t* = nullptr);
     template <gtd::numeric T, gtd::numeric R, gtd::calldblret<T, R> F, gtd::callret<T> GH, bool = false>
     HOST_DEVICE R simpdblquad(const F&,
                               T,
                               T,
                               const GH&,
                               const GH&,
-                              T abstol_y = 0.0625l/1024.0l,
-                              T reltol_y = 0.0625l/1024.0l,
-                              T ptol_y = 1/(1024.0l*1024.0l),
-                              uint64_t *mdepth_y = nullptr,
-                              T abstol_x = 0.0625l/1024.0l,
-                              T reltol_x = 0.0625l/1024.0l,
-                              T ptol_x = 1/(1024.0l*1024.0l),
-                              uint64_t *mdepth_x = nullptr);
+                              T = 0.0625l/1024.0l,
+                              T = 0.0625l/1024.0l,
+                              T = 1/(1024.0l*1024.0l),
+                              uint64_t* = nullptr,
+                              T = 0.0625l/1024.0l,
+                              T = 0.0625l/1024.0l,
+                              T = 1/(1024.0l*1024.0l),
+                              uint64_t* = nullptr);
 }
+#endif
 
 namespace gtd {
     class invalid_complex_operation : public std::logic_error {
@@ -151,7 +153,7 @@ namespace gtd {
             this->_imag = std::move(p.second);
             return *this;
         }
-        HOST_DEVICE explicit operator T() {
+        HOST_DEVICE explicit operator T() { // iffy - is this really what this should do?
             return this->_real;
         }
         HOST_DEVICE friend complex<T> operator*(const T &s, const complex<T> &c) {

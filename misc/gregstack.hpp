@@ -11,6 +11,33 @@
 
 #define DEF_STACK_SIZE 32
 
+#ifndef GREGCOMPLEX_HPP
+namespace diff {
+    template <gtd::numeric T, gtd::numeric R, gtd::callret<T, R> F, bool = false>
+    HOST_DEVICE R simpquad(const F&,
+                           T,
+                           T,
+                           T = 0.0625l/1024.0l,
+                           T = 0.0625l/1024.0l,
+                           T = 1/(1024.0l*1024.0l),
+                           uint64_t* = nullptr);
+    template <gtd::numeric T, gtd::numeric R, gtd::calldblret<T, R> F, gtd::callret<T> GH, bool = false>
+    HOST_DEVICE R simpdblquad(const F&,
+                              T,
+                              T,
+                              const GH&,
+                              const GH&,
+                              T = 0.0625l/1024.0l,
+                              T = 0.0625l/1024.0l,
+                              T = 1/(1024.0l*1024.0l),
+                              uint64_t* = nullptr,
+                              T = 0.0625l/1024.0l,
+                              T = 0.0625l/1024.0l,
+                              T = 1/(1024.0l*1024.0l),
+                              uint64_t* = nullptr);
+}
+#endif
+
 namespace gtd {
 #ifdef __CUDACC__
     class bad_gpu_alloc : std::runtime_error {
@@ -148,6 +175,10 @@ namespace gtd {
             _data = nullptr;
             _top = nullptr;
         }
+        template <gtd::numeric U, gtd::numeric R, gtd::callret<U, R> F, bool prog>
+        friend HOST_DEVICE R diff::simpquad(const F&, U, U, U, U, U, uint64_t*);
+        template <gtd::numeric U, gtd::numeric R, gtd::calldblret<U, R> F, gtd::callret<U> GH, bool prog>
+        friend HOST_DEVICE R diff::simpdblquad(const F&, U, U, const GH&, const GH&,U,U,U,uint64_t*,U,U,U,uint64_t*);
     };
 }
 
