@@ -21,12 +21,12 @@ namespace diff {
                            T = 0.0625l/1024.0l,
                            T = 1/(1024.0l*1024.0l),
                            uint64_t* = nullptr);
-    template <gtd::numeric T, gtd::numeric R, gtd::calldblret<T, R> F, gtd::callret<T> GH, bool = false>
+    template <gtd::numeric T, gtd::numeric R, gtd::calldblret<T, R> F, gtd::callret<T> G, gtd::callret<T> H, bool=false>
     HOST_DEVICE R simpdblquad(const F&,
                               T,
                               T,
-                              const GH&,
-                              const GH&,
+                              const G&,
+                              const H&,
                               T = 0.0625l/1024.0l,
                               T = 0.0625l/1024.0l,
                               T = 1/(1024.0l*1024.0l),
@@ -177,9 +177,8 @@ namespace gtd {
         }
         template <gtd::numeric U, gtd::numeric R, gtd::callret<U, R> F, bool prog>
         friend HOST_DEVICE R diff::simpquad(const F&, U, U, U, U, U, uint64_t*);
-        template <gtd::numeric U, gtd::numeric R, gtd::calldblret<U, R> F, gtd::callret<U> GH, bool prog>
-        friend HOST_DEVICE R diff::simpdblquad(const F&, U, U, const GH&, const GH&,U,U,U,uint64_t*,U,U,U,uint64_t*);
+        template <gtd::numeric U, gtd::numeric R, gtd::calldblret<U, R> F, gtd::callret<U> G, gtd::callret<U> H, bool prog>
+        friend HOST_DEVICE R diff::simpdblquad(const F&, U, U, const G&, const H&,U,U,U,uint64_t*,U,U,U,uint64_t*);
     };
 }
-
 #endif
