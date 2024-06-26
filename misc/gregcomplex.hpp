@@ -184,6 +184,12 @@ namespace gtd {
             T denom = c2._real*c2._real + c2._imag*c2._imag;
             return {(c1._real*c2._real + c1._imag*c2._imag)/denom, (c1._imag*c2._real - c1._real*c2._imag)/denom};
         }
+        HOST_DEVICE friend bool operator==(const complex<T> &c1, const complex<T> &c2) {
+            return c1._real == c2._real && c1._imag == c2._imag;
+        }
+        HOST_DEVICE friend bool operator!=(const complex<T> &c1, const complex<T> &c2) {
+            return c1._real != c2._real || c1._imag != c2._imag;
+        }
         friend std::ostream &operator<<(std::ostream &os, const complex<T> &c) {
 	        os << +c._real;
 	        if (c._imag >= 0)
