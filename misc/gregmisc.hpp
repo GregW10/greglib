@@ -341,5 +341,20 @@ namespace gtd {
     HOST_DEVICE T abs(const T &x) {
         return x >= 0 ? x : -x;
     }
+    template <typename T>
+    void print_array(const T *arr, uint64_t size) {
+        if (!arr) {
+            printf("[(null)]\n");
+            return;
+        }
+        if (!size) {
+            printf("[]\n");
+            return;
+        }
+        putchar('[');
+        while (size --> 0)
+            std::cout << *arr++ << ", ";
+        printf("\b\b]\n");
+    }
 }
 #endif
