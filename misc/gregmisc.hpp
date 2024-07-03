@@ -123,7 +123,7 @@ namespace gtd {
     }
 #endif
     template <std::integral T>
-    HOST_DEVICE void to_string(T val, char *buffer) {
+    void to_string(T val, char *buffer) {
         if (!val) {
             *buffer++ = 48;
             *buffer = 0;

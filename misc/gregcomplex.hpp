@@ -47,10 +47,10 @@ namespace gtd {
         T _real{};
 	    T _imag{};
     public:
-        const static inline gtd::complex<T> one{1};
-        const static inline gtd::complex<T> m_one{-1};
-        const static inline gtd::complex<T> imunit{0, 1};
-        const static inline gtd::complex<T> m_imunit{0, -1};
+        constexpr static inline gtd::complex<T> one{1};
+        constexpr static inline gtd::complex<T> m_one{-1};
+        constexpr static inline gtd::complex<T> imunit{0, 1};
+        constexpr static inline gtd::complex<T> m_imunit{0, -1};
 	    HOST_DEVICE constexpr complex() = default;
         HOST_DEVICE constexpr complex(const T &_real_) : _real{_real_} {}
 	    HOST_DEVICE constexpr complex(const T &_real_, const T &_imag_) : _real{_real_}, _imag{_imag_} {}
