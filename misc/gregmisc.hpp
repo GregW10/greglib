@@ -356,5 +356,33 @@ namespace gtd {
             std::cout << *arr++ << ", ";
         printf("\b\b]\n");
     }
+#ifdef __CUDACC__
+    class cuda_error : public std::exception {
+        char *msg{};
+    public:
+        explicit cuda_error(int line, const char *file, const char *error_s) {
+            msg = new char[40 + gtd::strlen_c(file) + gtd::strlen_c(error_s)];
+            gtd::strcpy_c(msg, "Error \"");
+            gtd::strcat_c(msg, error_s);
+            gtd::strcat_c(msg, "\" occurred in file \"");
+            gtd::strcat_c(msg, file);
+            gtd::strcat_c(msg, "\" on line ");
+            gtd::to_string(line, msg);
+            gtd::strcat_c(msg, ".\n");
+        }
+        const char *what() const noexcept override {
+            return this->msg;
+        }
+        ~cuda_error() {
+            delete [] msg;
+        }
+    };
+#define CUDA_ERROR(func_call) \
+    { cudaError_t err; \
+    if ((err = func_call) != cudaSuccess) { \
+        fprintf(stderr, "Error: %s\n", cudaGetErrorString(err)); \
+        throw gtd::cuda_error{__LINE__, __FILE__, cudaGetErrorString(err)}; \
+    } }
+#endif
 }
 #endif

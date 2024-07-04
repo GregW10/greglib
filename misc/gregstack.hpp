@@ -9,7 +9,11 @@
 #include <string>
 #include <cassert>
 
+#ifndef __CUDACC__
 #define DEF_STACK_SIZE 32
+#else
+#define DEF_STACK_SIZE 1
+#endif
 
 #ifndef GREGCOMPLEX_HPP
 namespace diff {
@@ -77,7 +81,12 @@ namespace gtd {
             //     error += "\".\n";
             //     throw bad_gpu_alloc{error};
             // }
+            // cudaError_t err = cudaMalloc(&_data, _asize*sizeof(T));
+            // if (err != cudaSuccess)
+            //     printf("Error: %s\n", cudaGetErrorString(err));
+            // assert(err == cudaSuccess);
             assert(cudaMalloc(&_data, _asize*sizeof(T)) == cudaSuccess);
+            // CUDA_ERROR(cudaMalloc(&_data, _asize*sizeof(T)));
             _top = _data;
         }
 #endif
@@ -98,6 +107,7 @@ namespace gtd {
                 // if (cudaMalloc(&ndata, _asize*sizeof(T)) != cudaSuccess)
                 //     throw bad_gpu_alloc{};
                 assert(cudaMalloc(&ndata, _asize*sizeof(T)) == cudaSuccess);
+                // CUDA_ERROR(cudaMalloc(&ndata, _asize*sizeof(T)));
 #endif
                 T *nptr = ndata;
                 T *dptr = _data;
@@ -110,6 +120,7 @@ namespace gtd {
                 // if (cudaFree(_data) != cudaSuccess)
                 //     throw bad_gpu_dealloc{};
                 assert(cudaFree(_data) == cudaSuccess);
+                // CUDA_ERROR(cudaFree(_data));
 #endif
                 _data = ndata;
                 _top = _data + _size++;
@@ -169,6 +180,7 @@ namespace gtd {
             delete [] _data;
 #else
             assert(cudaFree(_data) == cudaSuccess);
+            // CUDA_ERROR(cudaFree(_data));
 #endif
             _asize = 0;
             _size = 0;
