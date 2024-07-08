@@ -356,6 +356,88 @@ namespace gtd {
             std::cout << *arr++ << ", ";
         printf("\b\b]\n");
     }
+    template <numeric T, uint64_t N>
+    class point final { // point in N-dimensional space
+        T data[N];
+    public:
+        template <typename ...Args> requires (std::same_as<Args, T> && ...)
+        HOST_DEVICE explicit point(Args&& ...args) : data{args...} {
+            static_assert(sizeof...(args) == N, "Number of constructor arguments does not match N.\n");
+        }
+        HOST_DEVICE explicit point(const T *_data) {
+            if (!_data)
+                throw std::invalid_argument{"Error: nullptr passed as pointer to data.\n"};
+            memcopy(this->data, _data, sizeof(T)*N);
+        }
+        HOST_DEVICE point(const std::initializer_list<T> &_li) {
+            if (_li.size() != N)
+                throw std::invalid_argument{"Error: initialiser list size does not match N.\n"};
+            memcopy(this->data, _li.begin(), sizeof(T)*N);
+        }
+        HOST_DEVICE T mag_sq() const noexcept {
+            if constexpr (N == 0)
+                return 0;
+            if constexpr (N == 1)
+                return data[0]*data[0];
+            if constexpr (N == 2)
+                return data[0]*data[0] + data[1]*data[1];
+            if constexpr (N == 3)
+                return data[0]*data[0] + data[1]*data[1] + data[2]*data[2];
+            if constexpr (N == 4)
+                return data[0]*data[0] + data[1]*data[1] + data[2]*data[2] + data[3]*data[3];
+            T *ptr = data;
+            T _sum = 0;
+            uint64_t counter = N;
+            while (counter --> 0) {
+                _sum += (*ptr)*(*ptr);
+                ++ptr;
+            }
+            return _sum;
+        }
+        HOST_DEVICE T mag() const noexcept {
+            return std::sqrt(this->mag_sq());
+        }
+        template <numeric U, uint64_t M>
+        HOST_DEVICE friend U distance(const point<U, M> &p1, const point<U, M> &p2);
+        template <numeric U, uint64_t M>
+        HOST_DEVICE friend U max_dist(const point<U, M> *points, uint64_t _num);
+    };
+    template <numeric U, uint64_t M>
+    HOST_DEVICE U distance(const point<U, M> &p1, const point<U, M> &p2) {
+        const U *ptr1 = p1.data;
+        const U *ptr2 = p2.data;
+        U _sum = 0;
+        U _diff;
+        uint64_t counter = M;
+        while (counter --> 0) {
+            _diff = *ptr1++ - *ptr2++;
+            _sum += _diff*_diff;
+        }
+        return std::sqrt(_sum);
+    }
+    template <numeric U, uint64_t M>
+    HOST_DEVICE U max_dist(const point<U, M> *points, uint64_t _num) {
+        if constexpr (M == 0 || M == 1)
+            return 0;
+        if (!points || !_num)
+            return 0;
+        static constexpr uint64_t Mm1 = M - 1;
+        U _maxd = 0;
+        U _d;
+        const point<U, M> *outer = points;
+        const point<U, M> *inner;
+        uint64_t _i = 0;
+        uint64_t _j;
+        while (_i++ < Mm1) {
+            inner = outer + 1;
+            _j = _i;
+            while (_j++ < M)
+                if ((_d = distance(*outer, *inner++)) > _maxd)
+                    _maxd = _d;
+            ++outer;
+        }
+        return _maxd;
+    }
 #ifdef __CUDACC__
     class cuda_error : public std::exception {
         char *msg{};
