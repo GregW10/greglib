@@ -29,6 +29,9 @@ namespace diff {
                               T = 0.0625l/1024.0l,
                               T = 1/(1024.0l*1024.0l),
                               uint64_t* = nullptr);
+    template <gtd::numeric U, gtd::numeric R>
+        HOST_DEVICE inline bool collinear(const U&, const U&, const U&, const U&, const U&,
+                                          const R&, const R&, const R&, const R&, const R&, const U&);
 }
 #endif
 
@@ -203,6 +206,9 @@ namespace gtd {
         HOST_DEVICE friend R diff::simpquad(const F&, U, U, U, U, U, uint64_t*);
         template <gtd::numeric U, numeric R, calldblret<U, R> F, callret<U> G, callret<U> H, bool>
         HOST_DEVICE friend R diff::simpdblquad(const F&, U, U, const G&, const H&, U, U, U, uint64_t*, U, U, U, uint64_t*);
+        template <gtd::numeric U, gtd::numeric R>
+        HOST_DEVICE friend inline bool diff::collinear(const U&, const U&, const U&, const U&, const U&,
+                                                       const R&, const R&, const R&, const R&, const R&, const U&);
     };
 	template <numeric T>
 	HOST_DEVICE T abs(const complex<T> &c) {
