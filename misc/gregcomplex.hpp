@@ -114,7 +114,7 @@ namespace gtd {
 	    	return *this;
 	    }
     	HOST_DEVICE complex<T> &operator*=(const complex<T> &other) {
-            T _r = this->real;
+                T _r = this->_real;
 	    	this->_real = _r*other._real - this->_imag*other._imag;
 	    	this->_imag = _r*other._imag + this->_imag*other._real;
 	    	return *this;
