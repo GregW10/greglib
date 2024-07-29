@@ -466,5 +466,27 @@ namespace gtd {
         throw gtd::cuda_error{__LINE__, __FILE__, cudaGetErrorString(err)}; \
     } }
 #endif
+    const char *get_time() {
+        static char _str[26]{};
+        time_t _now = time(nullptr);
+        if (_now == ((time_t) -1))
+            return nullptr;
+        char *_s = ctime(&_now);
+        if (!_s)
+            return nullptr;
+        strcpy_c(_str, _s);
+        _str[3] = '_';
+        _str[7] = '_';
+        _str[10] = '_';
+        _str[13] = 'h';
+        _str[16] = 'm';
+        _str[19] = 's';
+        _str[24] = _str[23];
+        _str[23] = _str[22];
+        _str[22] = _str[21];
+        _str[21] = _str[20];
+        _str[20] = '_';
+        return _str;
+    }
 }
 #endif
