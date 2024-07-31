@@ -141,6 +141,24 @@ namespace gtd {
             val /= 10;
         }
     }
+    template <std::unsigned_integral T>
+    bool to_uint(const char *str, T *val) { // leaves val unchanged in case of first error (obviously), -1 in second er.
+        if (!str || !*str || !val)
+            return false;
+        T result = 0;
+        goto start;
+        do {
+            result *= 10;
+            start:
+            if (*str < 48 || *str > 57) {
+                *val = (T) -1;
+                return false;
+            }
+            result += *str++ - 48;
+        } while (*str);
+        *val = result;
+        return true;
+    }
     uint64_t write_all(int fd, const void *buff, size_t count) {
         size_t bwritten;
         size_t rem = count;

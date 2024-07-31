@@ -60,7 +60,9 @@ namespace gtd {
         HOST_DEVICE constexpr complex(const std::pair<T, T> &p) : _real{p.first}, _imag{p.second} {}
         HOST_DEVICE constexpr complex(const complex<T> &other) : _real{other._real}, _imag{other._imag} {}
         HOST_DEVICE complex(complex<T> &&other) : _real{std::move(other._real)}, _imag{std::move(other._imag)} {} // moving is almost certainly overkill
-	    HOST_DEVICE T real() const noexcept {
+        template <gtd::numeric U>
+        HOST_DEVICE constexpr explicit complex(const complex<U> &other):_real{(T) other._real},_imag{(T) other._imag} {}
+        HOST_DEVICE T real() const noexcept {
             return this->_real;
         }
         HOST_DEVICE T imag() const noexcept {
@@ -209,6 +211,8 @@ namespace gtd {
         template <gtd::numeric U, gtd::numeric R>
         HOST_DEVICE friend inline bool diff::collinear(const U&, const U&, const U&, const U&, const U&,
                                                        const R&, const R&, const R&, const R&, const R&, const U&);
+        template <gtd::numeric U>
+        friend class complex;
     };
 	template <numeric T>
 	HOST_DEVICE T abs(const complex<T> &c) {
