@@ -495,6 +495,8 @@ namespace gtd {
         strcpy_c(_str, _s);
         _str[3] = '_';
         _str[7] = '_';
+        if (_str[8] == ' ') // in case the day of the month is < 10
+            _str[8] = '0'; // just found this error as it is the 1st of August today lol
         _str[10] = '_';
         _str[13] = 'h';
         _str[16] = 'm';
