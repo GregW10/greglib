@@ -21,6 +21,7 @@ namespace gtd {
         std::vector<char*> *_s{};
         std::vector<IntType> *_i{};
         std::vector<FloatType> *_f{};
+        bool alloced = false;
         csv_col() = default;
     public:
         explicit csv_col(const char *name, uint64_t len = 0) {
@@ -32,13 +33,15 @@ namespace gtd {
                 while (len --> 0)
                     *ptr++ = *name++;
                 *ptr = 0;
-                return;
+            } else {
+                _name = new char[gml::gen::strlen_c(name) + 1];
+                gml::gen::strcpy_c(_name, name);
             }
-            _name = new char[gml::gen::strlen_c(name) + 1];
-            gml::gen::strcpy_c(_name, name);
+            alloced = true;
         }
         ~csv_col() {
-            delete [] _name;
+            if (alloced)
+                delete [] _name;
         }
         template <gml::Numeric, gml::Numeric>
         friend class csv;
@@ -50,6 +53,7 @@ namespace gtd {
         std::vector<csv_col<I, F>> _cols;
         gtd::mmapper _smap{};
         char *_sdata{};
+        uint64_t lf = 0; // longest field
         void load_csv(const char *path) {
             if (!path || !*path)
                 throw std::invalid_argument{"Error: nullptr or empty path.\n"};
@@ -65,15 +69,29 @@ namespace gtd {
             if (gtd::read_all(fd, _sdata, buff.st_size) != buff.st_size)
                 throw std::ios_base::failure{"Error: could not load CSV data.\n"};
             close(fd);
-            const char *ptr = _sdata;
+            char *sbeg = _sdata;
+            char *send = _sdata;
             const char *const _end = _sdata + buff.st_size;
-            while (*ptr != '\n') {
-                if (ptr == _end)
+            uint64_t flen;
+            const csv_col<I, F> def{};
+            while (1) {
+                if (send == _end)
                     throw csv_format_error{"Error: first line of CSV file does not end in newline.\n"};
-                if (*ptr == ',') {
-
+                if (*send == ',' || *send == '\n') {
+                    // _cols.emplace_back(sbeg, (flen = (uint64_t) (send - sbeg)));
+                    flen = (uint64_t) (send - sbeg);
+                    _cols.emplace_back(def);
+                    _cols.back()._name = sbeg;
+                    sbeg = send + 1;
+                    if (flen > lf)
+                        lf = flen;
+                    if (*send == '\n') {
+                        *send = 0;
+                        break;
+                    }
+                    *send = 0;
                 }
-                ++ptr;
+                ++send;
             }
             /* char buffer[BUFFER_SIZE]{};
             char *ptr;
@@ -155,7 +173,12 @@ namespace gtd {
             file.close(); */
         }
     public:
-        explicit csv(const char *path) {}
+        explicit csv(const char *path) {
+            this->load_csv(path);
+            for (const auto &c : _cols) {
+                std::cout << c._name << std::endl;
+            }
+        }
     };
 }
 
