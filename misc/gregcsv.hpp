@@ -2,6 +2,12 @@
 #define GREGCSV_HPP
 
 #include "ml/gregvct.hpp"
+#include "gregmisc.hpp"
+#include "gregmmapper.hpp"
+#include <unistd.h>
+#include <fcntl.h>
+
+#define BUFFER_SIZE 8'192
 
 namespace gtd {
     class csv_format_error : public std::ios_base::failure {
@@ -39,11 +45,56 @@ namespace gtd {
     };
     template <gml::Numeric IntType, gml::Numeric FloatType>
     class csv {
-        std::vector<csv_col<IntType, FloatType>> _cols;
+        using I = IntType;
+        using F = FloatType;
+        std::vector<csv_col<I, F>> _cols;
+        gtd::mmapper _smap{};
+        char *_sdata{};
         void load_csv(const char *path) {
             if (!path || !*path)
                 throw std::invalid_argument{"Error: nullptr or empty path.\n"};
-            std::ifstream file{path, std::ios_base::in};
+            struct stat buff{};
+            if (stat(path, &buff) == -1)
+                throw std::ios_base::failure{"Error: could not obtain file information.\n"};
+            if (!buff.st_size)
+                throw csv_format_error{"Error: invalid CSV format - file size is zero.\n"};
+            int fd = open(path, O_RDONLY);
+            if (fd == -1)
+                throw std::ios_base::failure{"Error: couldn't open CSV file.\n"};
+            _sdata = (char*) _smap.reset(buff.st_size);
+            if (gtd::read_all(fd, _sdata, buff.st_size) != buff.st_size)
+                throw std::ios_base::failure{"Error: could not load CSV data.\n"};
+            close(fd);
+            const char *ptr = _sdata;
+            const char *const _end = _sdata + buff.st_size;
+            while (*ptr != '\n') {
+                if (ptr == _end)
+                    throw csv_format_error{"Error: first line of CSV file does not end in newline.\n"};
+                if (*ptr == ',') {
+
+                }
+                ++ptr;
+            }
+            /* char buffer[BUFFER_SIZE]{};
+            char *ptr;
+            uint64_t c = 0;
+            uint64_t remb = buff.st_size;
+            uint64_t to_read;
+            while (1) {
+
+
+
+                --c;
+            }
+            while (remb) {
+                to_read = remb > BUFFER_SIZE ? BUFFER_SIZE : remb;
+                if (gtd::read_all(fd, buffer, to_read) != to_read)
+                    throw std::ios_base::failure{"Error: I/O error with CSV file.\n"};
+                remb -= to_read;
+                ptr = buffer;
+            }
+            */
+            /* std::ifstream file{path, std::ios_base::in};
             if (!file.good())
                 throw std::ios_base::failure{"Error: could not open file.\n"};
             std::string line;
@@ -101,7 +152,7 @@ namespace gtd {
             while (std::getline(file, line)) {
 
             }
-            file.close();
+            file.close(); */
         }
     public:
         explicit csv(const char *path) {}
