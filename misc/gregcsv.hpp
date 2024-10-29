@@ -6,6 +6,7 @@
 #include "gregmmapper.hpp"
 #include <unistd.h>
 #include <fcntl.h>
+#include <cinttypes>
 
 #define BUFFER_SIZE 8'192
 
@@ -38,10 +39,13 @@ namespace gtd {
                 gml::gen::strcpy_c(_name, name);
             }
             alloced = true;
+            this->_s = new std::vector<char*>{};
         }
         ~csv_col() {
             if (alloced)
                 delete [] _name;
+            if (this->_s)
+                delete this->_s;
         }
         template <gml::Numeric, gml::Numeric>
         friend class csv;
@@ -54,6 +58,8 @@ namespace gtd {
         gtd::mmapper _smap{};
         char *_sdata{};
         uint64_t lf = 0; // longest field
+        uint64_t nf = 0; // number of fields
+        uint64_t nl = 0; // number of lines (including header)
         void load_csv(const char *path) {
             if (!path || !*path)
                 throw std::invalid_argument{"Error: nullptr or empty path.\n"};
@@ -86,13 +92,47 @@ namespace gtd {
                     if (flen > lf)
                         lf = flen;
                     if (*send == '\n') {
-                        *send = 0;
+                        *send++ = 0;
                         break;
                     }
                     *send = 0;
                 }
                 ++send;
             }
+            this->nf = _cols.size();
+            this->nl = 1;
+            uint64_t fc = 0;
+            sbeg = send;
+            csv_col<I, F> *colsbeg = _cols.data();
+            csv_col<I, F> *colptr = colsbeg;
+            while (send != _end) {
+                /* if (send == _end) {
+                    if (fc)
+                        throw csv_format_error{"Error: CSV file either contains insufficient "
+                                               "number of fields on line or doesn't terminate with newline.\n"};
+                    break;
+                } */
+                if (*send == ',' || *send == '\n') {
+                    ++fc;
+                    flen = (uint64_t) (send - sbeg);
+                    if (flen > lf)
+                        lf = flen;
+                    colptr->_s->push_back(sbeg);
+                    *send = 0;
+                    if (*send == '\n') {
+                        if (fc < this->nf) {
+                            char error[80];
+                            sprintf(error, "Error: CSV file contains insufficient fields on line %" PRIu64 ".\n", this->nl);
+                            throw csv_format_error{error};
+                        }
+                    } else {
+                        if (fc == this->nf)
+                            throw csv_format_error{};
+                    }
+                }
+            }
+            if (*(send - 1) != '\n') // must find better way of doing this
+                throw csv_format_error{"Error: CSV file doesn't terminate with newline.\n"};
             /* char buffer[BUFFER_SIZE]{};
             char *ptr;
             uint64_t c = 0;
