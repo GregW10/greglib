@@ -18,13 +18,24 @@ namespace gtd {
     };
     template <gml::Numeric IntType, gml::Numeric FloatType>
     class csv_col {
+        using I = IntType;
+        using F = FloatType;
+        using VC = std::vector<char*>;
+        using VI = std::vector<I>;
+        using VF = std::vector<F>;
         char *_name{};
-        std::vector<char*> *_s{};
-        std::vector<IntType> *_i{};
-        std::vector<FloatType> *_f{};
+        VC *_s = new VC{};
+        VI *_i{};
+        VF *_f{};
         bool alloced = false;
-        csv_col() = default;
     public:
+        csv_col() = default;
+        explicit csv_col(uint64_t index) {
+            uint64_t num_digs = ((uint64_t) log10l((long double) index)) + 1;
+            _name = new char[num_digs + 1];
+            alloced = true;
+            snprintf(_name, num_digs + 1, "%" PRIu64, index);
+        }
         explicit csv_col(const char *name, uint64_t len = 0) {
             if (!name || !*name)
                 throw std::invalid_argument{"Error: a name must be passed.\n"};
@@ -46,6 +57,10 @@ namespace gtd {
                 delete [] _name;
             if (this->_s)
                 delete this->_s;
+            if (this->_i)
+                delete this->_i;
+            if (this->_f)
+                delete this->_f;
         }
         template <gml::Numeric, gml::Numeric>
         friend class csv;
@@ -60,7 +75,7 @@ namespace gtd {
         uint64_t lf = 0; // longest field
         uint64_t nf = 0; // number of fields
         uint64_t nl = 0; // number of lines (including header)
-        void load_csv(const char *path) {
+        void load_csv(const char *path, bool header) {
             if (!path || !*path)
                 throw std::invalid_argument{"Error: nullptr or empty path.\n"};
             struct stat buff{};
@@ -75,148 +90,58 @@ namespace gtd {
             if (gtd::read_all(fd, _sdata, buff.st_size) != buff.st_size)
                 throw std::ios_base::failure{"Error: could not load CSV data.\n"};
             close(fd);
-            char *sbeg = _sdata;
-            char *send = _sdata;
-            const char *const _end = _sdata + buff.st_size;
-            uint64_t flen;
-            const csv_col<I, F> def{};
-            while (1) {
-                if (send == _end)
-                    throw csv_format_error{"Error: first line of CSV file does not end in newline.\n"};
-                if (*send == ',' || *send == '\n') {
-                    // _cols.emplace_back(sbeg, (flen = (uint64_t) (send - sbeg)));
-                    flen = (uint64_t) (send - sbeg);
-                    _cols.emplace_back(def);
-                    _cols.back()._name = sbeg;
-                    sbeg = send + 1;
-                    if (flen > lf)
-                        lf = flen;
-                    if (*send == '\n') {
-                        *send++ = 0;
-                        break;
-                    }
-                    *send = 0;
-                }
-                ++send;
-            }
-            this->nf = _cols.size();
-            this->nl = 1;
-            uint64_t fc = 0;
-            sbeg = send;
-            csv_col<I, F> *colsbeg = _cols.data();
-            csv_col<I, F> *colptr = colsbeg;
-            while (send != _end) {
-                /* if (send == _end) {
-                    if (fc)
-                        throw csv_format_error{"Error: CSV file either contains insufficient "
-                                               "number of fields on line or doesn't terminate with newline.\n"};
-                    break;
-                } */
-                if (*send == ',' || *send == '\n') {
-                    ++fc;
-                    flen = (uint64_t) (send - sbeg);
-                    if (flen > lf)
-                        lf = flen;
-                    colptr->_s->push_back(sbeg);
-                    *send = 0;
-                    if (*send == '\n') {
-                        if (fc < this->nf) {
-                            char error[80];
-                            sprintf(error, "Error: CSV file contains insufficient fields on line %" PRIu64 ".\n", this->nl);
-                            throw csv_format_error{error};
+            char *sbeg = _sdata; // pointer to start of field string
+            char *send = _sdata; // pointer to end of field string
+            char *fend = _sdata + buff.st_size - 1; // pointer to last char in buffer
+            if (*fend != '\n')
+                throw csv_format_error{"Error: CSV file does not end in newline.\n"};
+            uint64_t flen; // field length
+            if (header) {
+                do {
+                    std::cout << "top" << std::endl;
+                    if (*send == ',' || *send == '\n') {
+                        if ((flen = (uint64_t) (send - sbeg)) > this->lf)
+                            this->lf = flen;
+                        this->_cols.emplace_back();
+                        this->_cols.back()._name = sbeg;
+                        sbeg = send + 1;
+                        ++this->nf;
+                        if (*send == '\n') {
+                            *send++ = 0;
+                            break;
                         }
-                    } else {
-                        if (fc == this->nf)
-                            throw csv_format_error{};
+                        *send = 0;
                     }
-                }
-            }
-            if (*(send - 1) != '\n') // must find better way of doing this
-                throw csv_format_error{"Error: CSV file doesn't terminate with newline.\n"};
-            /* char buffer[BUFFER_SIZE]{};
-            char *ptr;
-            uint64_t c = 0;
-            uint64_t remb = buff.st_size;
-            uint64_t to_read;
-            while (1) {
-
-
-
-                --c;
-            }
-            while (remb) {
-                to_read = remb > BUFFER_SIZE ? BUFFER_SIZE : remb;
-                if (gtd::read_all(fd, buffer, to_read) != to_read)
-                    throw std::ios_base::failure{"Error: I/O error with CSV file.\n"};
-                remb -= to_read;
-                ptr = buffer;
-            }
-            */
-            /* std::ifstream file{path, std::ios_base::in};
-            if (!file.good())
-                throw std::ios_base::failure{"Error: could not open file.\n"};
-            std::string line;
-            std::getline(file, line);
-            if (line.empty())
-                throw csv_format_error{"Error: empty CSV file -> nothing to load.\n"};
-            // if (line.front() == '\n')
-            //     throw csv_format_error{"Error: BLAH.\n"};
-            const char *sptr = line.data();
-            const char *eptr = line.data();
-            uint64_t len = 0;
-            uint64_t nempty = 0;
-            uint64_t nreps;
-            std::vector<std::string> cnames;
-            std::string cname;
-            std::vector<std::string>::size_type pos = 0;
-            std::vector<std::string>::iterator it;
-            std::vector<std::string>::iterator end;
-            bool oot = false;
-            do {
-                if (*eptr != ',') {
-                    if (*eptr == '\n') {
-                        oot = true;
-                        goto _rest;
-                    }
-                    ++eptr;
-                    ++len;
-                    continue;
-                }
-                _rest:
-                if (!len) { // case for empty column
-                    pos = 0;
-                    cname = "NONAME_";
-                    _start:
-                    cname += std::to_string(++nempty);
-                    it = cnames.begin() + pos;
-                    end = cnames.end();
-                    while (it != end) {
-                        ++pos;
-                        if (cname == *it++) {
-                            cname.erase(cname.begin() + 7, cname.end());
-                            goto _start;
+                    std::cout << "bottom" << std::endl;
+                } while (++send != fend);
+                ++this->nl;
+            } else {
+                do {
+                    if (*send == ',' || *send == '\n') {
+                        if ((flen = (uint64_t) (send - sbeg)) > this->lf)
+                            this->lf = flen;
+                        this->_cols.emplace_back(this->nf);
+                        this->_cols.back()._s->emplace_back(sbeg);
+                        sbeg = send + 1;
+                        ++this->nf;
+                        if (*send == '\n') {
+                            *send++ = 0;
+                            break;
                         }
+                        *send = 0;
                     }
-                    cnames.push_back(cname);
-                } else {
-                    cnames.emplace_back(sptr, len);
-                    len = 0;
-                }
-                if (oot)
-                    break;
-                ++eptr;
-                sptr = eptr;
-            } while (1);
-            while (std::getline(file, line)) {
-
+                    std::cout << "bottom" << std::endl;
+                } while (++send != fend);
+                ++this->nl; // keep this like this or add an extra line for inserted indices header?
             }
-            file.close(); */
         }
     public:
-        explicit csv(const char *path) {
-            this->load_csv(path);
+        explicit csv(const char *path, bool header = true) {
+            this->load_csv(path, header);
             for (const auto &c : _cols) {
                 std::cout << c._name << std::endl;
+                for (const auto &s : *c._s)
+                    std::cout << s << std::endl;
             }
         }
     };
