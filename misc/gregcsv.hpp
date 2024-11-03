@@ -17,6 +17,8 @@ namespace gtd {
         csv_format_error() : std::ios_base::failure{"Error: invalid CSV format.\n"} {}
     };
     template <gml::Numeric IntType, gml::Numeric FloatType>
+    class csv;
+    template <gml::Numeric IntType, gml::Numeric FloatType>
     class csv_col {
         using I = IntType;
         using F = FloatType;
@@ -28,17 +30,16 @@ namespace gtd {
         VI *_i{};
         VF *_f{};
         bool alloced = false;
+        uint64_t _lf = 0; // longest field
     public:
-        csv_col() : _s{new VC{}} {
-            // printf("----------\nCONSTRUCTING.\n");
-            // printf("This: %p\n", this);
-            // printf("Pointer: %p\n----------\n\n", this->_s);
-        }
-        explicit csv_col(uint64_t index) : _s{new VC{}} {
+        csv_col() : _s{new VC{}} {}
+        explicit csv_col(uint64_t index, uint64_t *out_digs = nullptr) : _s{new VC{}} {
             uint64_t num_digs = ((uint64_t) log10l((long double) index)) + 1;
             _name = new char[num_digs + 1];
             alloced = true;
             snprintf(_name, num_digs + 1, "%" PRIu64, index);
+            if (out_digs)
+                *out_digs = num_digs;
         }
         explicit csv_col(const char *name, uint64_t len = 0) {
             if (!name || !*name)
@@ -94,29 +95,21 @@ namespace gtd {
             other.alloced = false;
         }
         ~csv_col() {
-            // printf("----------\nSTART DTOR.\n");
             if (alloced)
                 delete [] _name;
-            //std::cout << "After 1" << std::endl;
-            // printf("This: %p\n", this);
-            // printf("Pointer: %p\n", this->_s);
-            if (this->_s) {
+            if (this->_s)
                 delete this->_s;
-                this->_s = nullptr;
-            }
-            //std::cout << "After 2" << std::endl;
             if (this->_i)
                 delete this->_i;
-            //std::cout << "After 3" << std::endl;
             if (this->_f)
                 delete this->_f;
-            //std::cout << "After 4" << std::endl;
-            // printf("END DTOR.\n----------\n\n");
         }
         template <gml::Numeric, gml::Numeric>
         friend class csv;
+        template <gml::Numeric II, gml::Numeric FF>
+        friend std::ostream &operator<<(std::ostream &os, const csv<II, FF> &f);
     };
-    template <gml::Numeric IntType, gml::Numeric FloatType>
+    template <gml::Numeric IntType = uint64_t, gml::Numeric FloatType = long double>
     class csv {
         using I = IntType;
         using F = FloatType;
@@ -126,7 +119,7 @@ namespace gtd {
         uint64_t lf = 0; // longest field
         uint64_t nf = 0; // number of fields
         uint64_t nl = 0; // number of lines (including header)
-        void load_csv(const char *path, bool header) {
+        void load_csv(const char *path, int options) {
             if (!path || !*path)
                 throw std::invalid_argument{"Error: nullptr or empty path.\n"};
             struct stat buff{};
@@ -147,38 +140,35 @@ namespace gtd {
             if (*(fend - 1) != '\n')
                 throw csv_format_error{"Error: CSV file does not end in newline.\n"};
             uint64_t flen; // field length
-            if (header) {
+            uint64_t tlen; // temp var.
+            if (options & read_hdr) {
                 do {
-                    //std::cout << "top" << std::endl;
                     if (*send == ',' || *send == '\n') {
-                        // std::cout << "inside" << std::endl;
-                        if ((flen = (uint64_t) (send - sbeg)) > this->lf)
-                            this->lf = flen;
-                        // printf("Before emplacing.\n");
+                        //if ((flen = (uint64_t) (send - sbeg)) > this->lf)
+                            //this->lf = flen;
                         this->_cols.emplace_back();
-                        // printf("After emplacing.\n");
                         this->_cols.back()._name = sbeg;
+                        this->_cols.back()._lf = (uint64_t) (send - sbeg);
                         sbeg = send + 1;
                         ++this->nf;
-                        //std::cout << "just before" << std::endl;
                         if (*send == '\n') {
                             *send++ = 0;
                             break;
                         }
                         *send = 0;
-                        //std::cout << "end of inside" << std::endl;
                     }
-                    //std::cout << "bottom" << std::endl;
                     ++send;
-                } while (1); // (++send != fend);
+                } while (1);
                 ++this->nl;
             } else {
                 do {
                     if (*send == ',' || *send == '\n') {
-                        if ((flen = (uint64_t) (send - sbeg)) > this->lf)
-                            this->lf = flen;
-                        this->_cols.emplace_back(this->nf);
+                        //if ((flen = (uint64_t) (send - sbeg)) > this->lf)
+                            //this->lf = flen;
+                        this->_cols.emplace_back(this->nf, &flen);
                         this->_cols.back()._s->emplace_back(sbeg);
+                        tlen = (uint64_t) (send - sbeg);
+                        this->_cols.back()._lf = flen > tlen ? flen : tlen;
                         sbeg = send + 1;
                         ++this->nf;
                         if (*send == '\n') {
@@ -187,9 +177,8 @@ namespace gtd {
                         }
                         *send = 0;
                     }
-                    // std::cout << "bottom22222222" << std::endl;
                     ++send;
-                } while (1); //(++send != fend);
+                } while (1);
                 this->nl = 2; // keep this like this or add an extra line for inserted indices header?
             }
             uint64_t fc = 0; // field counter
@@ -199,18 +188,20 @@ namespace gtd {
                 if (*send == ',' || *send == '\n') {
                     if (++fc == this->nf && *send == ',') {
                         char error[60];
-                        snprintf(error, 60, "Error: too many fields found on line %" PRIu64 "\n.", this->nl + !header);
+                        snprintf(error, 60, "Error: too many fields found on line %" PRIu64 "\n.", this->nl + (options & read_hdr == read_hdr));
                         throw csv_format_error{error};
                     }
-                    if ((flen = (uint64_t) (send - sbeg)) > this->lf)
-                        this->lf = flen;
+                    //if ((flen = (uint64_t) (send - sbeg)) > this->lf)
+                        //this->lf = flen;
+                    if ((flen = (uint64_t) (send - sbeg)) > colptr->_lf)
+                        colptr->_lf = flen;
                     colptr->_s->emplace_back(sbeg);
                     sbeg = send + 1;
                     if (*send == '\n') {
                         ++this->nl;
                         if (fc < this->nf) {
                             char error[60];
-                            snprintf(error, 60, "Error: too few fields found on line %" PRIu64 "\n.", this->nl + !header);
+                            snprintf(error, 60, "Error: too few fields found on line %" PRIu64 "\n.", this->nl + (options & read_hdr == read_hdr));
                             throw csv_format_error{error};
                         }
                         *send = 0;
@@ -224,16 +215,64 @@ namespace gtd {
             } while (++send != fend);
         }
     public:
-        explicit csv(const char *path, bool header = true) {
-            this->load_csv(path, header);
-            for (const auto &c : _cols) {
-                std::cout << c._name << std::endl;
-                for (const auto &s : *c._s)
-                    std::cout << s << std::endl;
-                putchar('\n');
+        static constexpr int read_hdr = 1; // if set, treat the first row of the CSV as the header
+        static constexpr int conv_int = 2; // if set, attempt to convert values to integers
+        static constexpr int conv_flt = 4; // if set, attempt to convert values to floats
+        static constexpr int conv_all = 8; // if set, do not "give up" on columns whose values are not all numeric (store non-numeric ones as NaN) - requires at least one of "conv_int" or "conv_flt"
+        explicit csv(const char *path, int options = read_hdr) {
+            this->load_csv(path, options);
+        }
+        template <gml::Numeric II, gml::Numeric FF>
+        friend std::ostream &operator<<(std::ostream &os, const csv<II, FF> &f) {
+            static char buff[256] = {0};
+            uint64_t counter;
+            if (!buff[0]) {
+                counter = 256;
+                char *ptr = buff;
+                while (counter --> 0)
+                    *ptr++ = '-';
             }
+            const csv_col<I, F> *colbeg = f._cols.data();
+            const csv_col<I, F> *colptr = colbeg;
+            uint64_t totw = f.nf*3 + 1; // total summed width of all maximum field lengths of columns
+            counter = f.nf;
+            while (counter --> 0)
+                totw += colptr++->_lf;
+#define HYPHENS \
+            counter = totw; \
+            while (1) { \
+                if (counter <= 256) { \
+                    os.write(buff, counter); \
+                    break; \
+                } \
+                os.write(buff, 256); \
+                counter -= 256; \
+            } \
+            os << '\n';
+            HYPHENS
+            counter = f.nf;
+            colptr = colbeg;
+            while (counter --> 0) {
+                os << "| " << std::left << std::setw(colptr->_lf) << colptr++->_name << ' ';
+            }
+            os << "|\n";
+            HYPHENS
+            counter = 0; // starting at 1 since header has been printed
+            uint64_t ic; // inner counter
+            uint64_t tt = f.nl - 1;
+            while (counter < tt) {
+                ic = f.nf;
+                colptr = colbeg;
+                while (ic --> 0) {
+                    os << "| " << std::left << std::setw(colptr->_lf) << (colptr++->_s->operator[](counter)) << ' ';
+                }
+                os << "|\n";
+                ++counter;
+            }
+            HYPHENS
+#undef HYPHENS
+            return os;
         }
     };
 }
-
 #endif
