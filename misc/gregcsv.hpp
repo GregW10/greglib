@@ -16,19 +16,15 @@ namespace gtd {
         explicit csv_format_error(const char *msg) : std::ios_base::failure{msg} {}
         csv_format_error() : std::ios_base::failure{"Error: invalid CSV format.\n"} {}
     };
-    template <gml::Numeric IntType, gml::Numeric FloatType>
+    template <std::floating_point>
     class csv;
-    template <gml::Numeric IntType, gml::Numeric FloatType>
+    template <std::floating_point T>
     class csv_col {
-        using I = IntType;
-        using F = FloatType;
         using VC = std::vector<char*>;
-        using VI = std::vector<I>;
-        using VF = std::vector<F>;
+        using VT = std::vector<T>;
         char *_name{};
         VC *_s{};
-        VI *_i{};
-        VF *_f{};
+        VT *_v{};
         bool alloced = false;
         uint64_t _lf = 0; // longest field
     public:
@@ -57,41 +53,35 @@ namespace gtd {
             alloced = true;
             this->_s = new VC{};
         }
-        csv_col(const csv_col<I, F> &other) : _name{new char[gtd::strlen_c(other._name) + 1]},
+        csv_col(const csv_col<T> &other) : _name{new char[gtd::strlen_c(other._name) + 1]},
                                               _s{other._s ? new VC{*other._s} : nullptr},
-                                              _i{other._i ? new VI{*other._i} : nullptr},
-                                              _f{other._f ? new VF{*other._f} : nullptr},
+                                              _v{other._v ? new VT{*other._v} : nullptr},
                                               alloced{true} {
             gtd::strcpy_c(this->_name, other._name);
         }
-        csv_col(csv_col<I, F> &&other) : _name{other._name},
+        csv_col(csv_col<T> &&other) : _name{other._name},
                                          _s{other._s},
-                                         _i{other._i},
-                                         _f{other._f},
+                                         _v{other._v},
                                          alloced{other.alloced} {
             other._name = nullptr;
             other._s = nullptr;
-            other._i = nullptr;
-            other._f = nullptr;
+            other._v = nullptr;
             other.alloced = false;
         }
-        csv_col<I, F> &operator=(const csv_col<I, F> &other) {
+        csv_col<T> &operator=(const csv_col<T> &other) {
             _name = new char[gtd::strlen_c(other._name) + 1];
             _s = other._s ? new VC{*other._s} : nullptr;
-            _i = other._i ? new VI{*other._i} : nullptr;
-            _f = other._f ? new VF{*other._f} : nullptr;
+            _v = other._v ? new VT{*other._v} : nullptr;
             alloced = true;
         }
-        csv_col<I, F> &operator=(csv_col<I, F> &&other) {
+        csv_col<T> &operator=(csv_col<T> &&other) {
             this->_name = other._name;
             this->_s = other._s;
-            this->_i = other._i;
-            this->_f = other._f;
+            this->_v = other._v;
             this->alloced = other.alloced;
             other._name = nullptr;
             other._s = nullptr;
-            other._i = nullptr;
-            other._f = nullptr;
+            other._v = nullptr;
             other.alloced = false;
         }
         ~csv_col() {
@@ -99,21 +89,17 @@ namespace gtd {
                 delete [] _name;
             if (this->_s)
                 delete this->_s;
-            if (this->_i)
-                delete this->_i;
-            if (this->_f)
-                delete this->_f;
+            if (this->_v)
+                delete this->_v;
         }
-        template <gml::Numeric, gml::Numeric>
+        template <std::floating_point>
         friend class csv;
-        template <gml::Numeric II, gml::Numeric FF>
-        friend std::ostream &operator<<(std::ostream &os, const csv<II, FF> &f);
+        template <std::floating_point U>
+        friend std::ostream &operator<<(std::ostream &os, const csv<U> &f);
     };
-    template <gml::Numeric IntType = uint64_t, gml::Numeric FloatType = long double>
+    template <std::floating_point T = long double>
     class csv {
-        using I = IntType;
-        using F = FloatType;
-        std::vector<csv_col<I, F>> _cols;
+        std::vector<csv_col<T>> _cols;
         gtd::mmapper _smap{};
         char *_sdata{};
         uint64_t lf = 0; // longest field
@@ -144,8 +130,6 @@ namespace gtd {
             if (options & read_hdr) {
                 do {
                     if (*send == ',' || *send == '\n') {
-                        //if ((flen = (uint64_t) (send - sbeg)) > this->lf)
-                            //this->lf = flen;
                         this->_cols.emplace_back();
                         this->_cols.back()._name = sbeg;
                         this->_cols.back()._lf = (uint64_t) (send - sbeg);
@@ -163,8 +147,6 @@ namespace gtd {
             } else {
                 do {
                     if (*send == ',' || *send == '\n') {
-                        //if ((flen = (uint64_t) (send - sbeg)) > this->lf)
-                            //this->lf = flen;
                         this->_cols.emplace_back(this->nf, &flen);
                         this->_cols.back()._s->emplace_back(sbeg);
                         tlen = (uint64_t) (send - sbeg);
@@ -182,8 +164,8 @@ namespace gtd {
                 this->nl = 2; // keep this like this or add an extra line for inserted indices header?
             }
             uint64_t fc = 0; // field counter
-            csv_col<I, F> *colbeg = this->_cols.data();
-            csv_col<I, F> *colptr = colbeg;
+            csv_col<T> *colbeg = this->_cols.data();
+            csv_col<T> *colptr = colbeg;
             do {
                 if (*send == ',' || *send == '\n') {
                     if (++fc == this->nf && *send == ',') {
@@ -191,8 +173,6 @@ namespace gtd {
                         snprintf(error, 60, "Error: too many fields found on line %" PRIu64 "\n.", this->nl + (options & read_hdr == read_hdr));
                         throw csv_format_error{error};
                     }
-                    //if ((flen = (uint64_t) (send - sbeg)) > this->lf)
-                        //this->lf = flen;
                     if ((flen = (uint64_t) (send - sbeg)) > colptr->_lf)
                         colptr->_lf = flen;
                     colptr->_s->emplace_back(sbeg);
@@ -213,17 +193,110 @@ namespace gtd {
                     ++colptr;
                 }
             } while (++send != fend);
+            if (options & conv_num) {
+                std::istringstream iss;
+                T val;
+                uint64_t nl_m1 = this->nl - 1;
+                char **cptr;
+                bool at_least_one;
+                if (options & conv_all) {
+                    if (options & prelimfp) {
+                        std::vector<bool> bvec;
+                        bvec.reserve(nl_m1);
+                        bool bval;
+                        for (const csv_col<T> &_col : this->_cols) {
+                            at_least_one = false;
+                            for (const char*& _p : _col._s) {
+                                iss.str(_p);
+                                bvec.push_back((bval = (bool) (iss >> val)));
+                                at_least_one |= bval;
+                            }
+                            if (!at_least_one) {
+                                bvec.clear();
+                                continue;
+                            }
+                            _col._v = new std::vector<T>{};
+                            _col._v->reserve(nl_m1);
+                            cptr = _col._s->data();
+                            for (const auto &_b : bvec) {
+                                if (_b) {
+                                    iss.str(*cptr++);
+                                    iss >> val;
+                                    _col._v->emplace_back(val);
+                                } else
+                                    _col._v->emplace_back(std::numeric_limits<T>::quiet_NaN());
+                            }
+                        }
+                    } else {
+                        for (const csv_col<T> &_col : this->_cols) {
+                            _col._v = new std::vector<T>{};
+                            _col._v->reserve(nl_m1);
+                            at_least_one = false;
+                            for (const char* &_p : *(_col._s)) {
+                                iss.str(_p);
+                                if (iss >> val) {
+                                    _col._v->emplace_back(val);
+                                    at_least_one = true;
+                                }
+                                else
+                                    _col._v->emplace_back(std::numeric_limits<T>::quiet_NaN());
+                            }
+                            if (!at_least_one) {
+                                delete _col._v;
+                                _col._v = nullptr;
+                            }
+                        }
+                    }
+                    return;
+                }
+                if (options & prelimfp) {
+                    bool all_good;
+                    for (const csv_col<T> &_col : this->_cols) {
+                        all_good = true;
+                        for (const char* &_p : *(_col._s)) {
+                            iss.str(_p);
+                            if (!(iss >> val)) {
+                                all_good = false;
+                                break;
+                            }
+                        }
+                        if (!all_good)
+                            continue;
+                        _col._v = new std::vector<T>{};
+                        _col._v->reserve(nl_m1);
+                        for (const char* &_p : *(_col._s)) {
+                            iss.str(_p);
+                            iss >> val;
+                            _col._v->emplace_back(val);
+                        }
+                    }
+                    return;
+                }
+                for (const csv_col<T> &_col : this->_cols) {
+                    _col._v = new std::vector<T>{};
+                    for (const char* &_p : *(_col._s)) {
+                        iss.str(_p);
+                        if (iss >> val)
+                            _col._v->emplace_back(val);
+                        else {
+                            delete _col._v;
+                            _col._v = nullptr;
+                            break;
+                        }
+                    }
+                }
+            }
         }
     public:
         static constexpr int read_hdr = 1; // if set, treat the first row of the CSV as the header
-        static constexpr int conv_int = 2; // if set, attempt to convert values to integers
-        static constexpr int conv_flt = 4; // if set, attempt to convert values to floats
-        static constexpr int conv_all = 8; // if set, do not "give up" on columns whose values are not all numeric (store non-numeric ones as NaN) - requires at least one of "conv_int" or "conv_flt"
-        explicit csv(const char *path, int options = read_hdr) {
+        static constexpr int conv_num = 2; // if set, attempt to convert values to type T
+        static constexpr int conv_all = 4; // if set, do not "give up" on columns whose values are not all numeric (store non-numeric ones as NaN) - requires "conv_num"
+        static constexpr int prelimfp = 8; // if set, perform a forward-pass over column first to check if all values can be converted, before allocating memory - requires "conv_num"
+        explicit csv(const char *path, int options = read_hdr | conv_num) {
             this->load_csv(path, options);
         }
-        template <gml::Numeric II, gml::Numeric FF>
-        friend std::ostream &operator<<(std::ostream &os, const csv<II, FF> &f) {
+        template <std::floating_point U>
+        friend std::ostream &operator<<(std::ostream &os, const csv<U> &f) {
             static char buff[256] = {0};
             uint64_t counter;
             if (!buff[0]) {
@@ -232,8 +305,8 @@ namespace gtd {
                 while (counter --> 0)
                     *ptr++ = '-';
             }
-            const csv_col<I, F> *colbeg = f._cols.data();
-            const csv_col<I, F> *colptr = colbeg;
+            const csv_col<U> *colbeg = f._cols.data();
+            const csv_col<U> *colptr = colbeg;
             uint64_t totw = f.nf*3 + 1; // total summed width of all maximum field lengths of columns
             counter = f.nf;
             while (counter --> 0)
