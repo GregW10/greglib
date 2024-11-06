@@ -159,6 +159,23 @@ namespace gtd {
         *val = result;
         return true;
     }
+    template <std::floating_point T>
+    bool to_float(const char *str, T *out) {
+        if (!str || !*str)
+            return false;
+        char *endptr{};
+        T val;
+        if constexpr (std::same_as<T, float>)
+            val = strtof(str, &endptr);
+        if constexpr (std::same_as<T, double>)
+            val = strtod(str, &endptr);
+        if constexpr (std::same_as<T, long double>)
+            val = strtold(str, &endptr);
+        if (endptr == str)
+            return false;
+        *out = val;
+        return true;
+    }
     uint64_t write_all(int fd, const void *buff, size_t count) {
         size_t bwritten;
         size_t rem = count;

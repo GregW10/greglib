@@ -27,6 +27,7 @@ namespace gtd {
         VT *_v{};
         bool alloced = false;
         uint64_t _lf = 0; // longest field
+        VC _to_free{};
     public:
         csv_col() : _s{new VC{}} {}
         explicit csv_col(uint64_t index, uint64_t *out_digs = nullptr) : _s{new VC{}} {
@@ -59,14 +60,50 @@ namespace gtd {
                                               alloced{true} {
             gtd::strcpy_c(this->_name, other._name);
         }
-        csv_col(csv_col<T> &&other) : _name{other._name},
-                                         _s{other._s},
-                                         _v{other._v},
-                                         alloced{other.alloced} {
+        csv_col(csv_col<T> &&other) noexcept : _name{other._name},
+                                                  _s{other._s},
+                                                  _v{other._v},
+                                             alloced{other.alloced} {
             other._name = nullptr;
             other._s = nullptr;
             other._v = nullptr;
             other.alloced = false;
+        }
+        const char *name() const noexcept {
+            return this->_name;
+        }
+        uint64_t size() const noexcept {
+            return this->_s->size();
+        }
+        bool has_nums() const noexcept {
+            return this->_v;
+        }
+        void push(const char *str, bool dup_str = true) {
+            /* Appends string to string array.
+             * If float array set, attempts to convert to float. If fails, adds NaN. */
+            if (dup_str) {
+                char *nstr = new char[gtd::strlen_c(str) + 1];
+                gtd::strcpy_c(nstr, str);
+                this->_to_free.emplace_back(nstr);
+                this->_s->emplace_back(nstr);
+            } else
+                this->_s->emplace_back(str);
+            if (this->_v) {
+                T val;
+                if (gtd::to_float(str, &val))
+                    this->_v->emplace_back(val);
+                else
+                    this->_v->emplace_back(std::numeric_limits<T>::quiet_NaN());
+            }
+        }
+        void push(const T &_num) {
+            
+        }
+        char *operator()(uint64_t sindex) { // no bounds-checking
+            return this->_s->operator[](sindex);
+        }
+        T &operator[](uint64_t nindex) { // no bounds-checking
+            return this->_v->operator[](nindex);
         }
         csv_col<T> &operator=(const csv_col<T> &other) {
             _name = new char[gtd::strlen_c(other._name) + 1];
@@ -74,7 +111,7 @@ namespace gtd {
             _v = other._v ? new VT{*other._v} : nullptr;
             alloced = true;
         }
-        csv_col<T> &operator=(csv_col<T> &&other) {
+        csv_col<T> &operator=(csv_col<T> &&other) noexcept {
             this->_name = other._name;
             this->_s = other._s;
             this->_v = other._v;
@@ -91,11 +128,13 @@ namespace gtd {
                 delete this->_s;
             if (this->_v)
                 delete this->_v;
+            for (char *& _str : this->_to_free)
+                delete [] _str;
         }
         template <std::floating_point>
         friend class csv;
-        template <std::floating_point U>
-        friend std::ostream &operator<<(std::ostream &os, const csv<U> &f);
+        // template <std::floating_point U>
+        friend std::ostream &operator<<(std::ostream&, const csv<T>&);
     };
     template <std::floating_point T = long double>
     class csv {
@@ -204,9 +243,9 @@ namespace gtd {
                         std::vector<bool> bvec;
                         bvec.reserve(nl_m1);
                         bool bval;
-                        for (const csv_col<T> &_col : this->_cols) {
+                        for (csv_col<T> &_col : this->_cols) {
                             at_least_one = false;
-                            for (const char*& _p : _col._s) {
+                            for (const char* const& _p : *(_col._s)) {
                                 iss.str(_p);
                                 bvec.push_back((bval = (bool) (iss >> val)));
                                 at_least_one |= bval;
@@ -228,11 +267,11 @@ namespace gtd {
                             }
                         }
                     } else {
-                        for (const csv_col<T> &_col : this->_cols) {
+                        for (csv_col<T> &_col : this->_cols) {
                             _col._v = new std::vector<T>{};
                             _col._v->reserve(nl_m1);
                             at_least_one = false;
-                            for (const char* &_p : *(_col._s)) {
+                            for (const char* const& _p : *(_col._s)) {
                                 iss.str(_p);
                                 if (iss >> val) {
                                     _col._v->emplace_back(val);
@@ -251,9 +290,9 @@ namespace gtd {
                 }
                 if (options & prelimfp) {
                     bool all_good;
-                    for (const csv_col<T> &_col : this->_cols) {
+                    for (csv_col<T> &_col : this->_cols) {
                         all_good = true;
-                        for (const char* &_p : *(_col._s)) {
+                        for (const char* const& _p : *(_col._s)) {
                             iss.str(_p);
                             if (!(iss >> val)) {
                                 all_good = false;
@@ -264,7 +303,7 @@ namespace gtd {
                             continue;
                         _col._v = new std::vector<T>{};
                         _col._v->reserve(nl_m1);
-                        for (const char* &_p : *(_col._s)) {
+                        for (const char* const& _p : *(_col._s)) {
                             iss.str(_p);
                             iss >> val;
                             _col._v->emplace_back(val);
@@ -272,9 +311,9 @@ namespace gtd {
                     }
                     return;
                 }
-                for (const csv_col<T> &_col : this->_cols) {
+                for (csv_col<T> &_col : this->_cols) {
                     _col._v = new std::vector<T>{};
-                    for (const char* &_p : *(_col._s)) {
+                    for (const char* const& _p : *(_col._s)) {
                         iss.str(_p);
                         if (iss >> val)
                             _col._v->emplace_back(val);
@@ -295,8 +334,8 @@ namespace gtd {
         explicit csv(const char *path, int options = read_hdr | conv_num) {
             this->load_csv(path, options);
         }
-        template <std::floating_point U>
-        friend std::ostream &operator<<(std::ostream &os, const csv<U> &f) {
+        // template <std::floating_point U>
+        friend std::ostream &operator<<(std::ostream &os, const csv<T> &f) {
             static char buff[256] = {0};
             uint64_t counter;
             if (!buff[0]) {
@@ -305,8 +344,8 @@ namespace gtd {
                 while (counter --> 0)
                     *ptr++ = '-';
             }
-            const csv_col<U> *colbeg = f._cols.data();
-            const csv_col<U> *colptr = colbeg;
+            const csv_col<T> *colbeg = f._cols.data();
+            const csv_col<T> *colptr = colbeg;
             uint64_t totw = f.nf*3 + 1; // total summed width of all maximum field lengths of columns
             counter = f.nf;
             while (counter --> 0)
