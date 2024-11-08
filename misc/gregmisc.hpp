@@ -161,7 +161,7 @@ namespace gtd {
     }
     template <std::floating_point T>
     bool to_float(const char *str, T *out) {
-        if (!str || !*str)
+        if (!str || !*str || !out)
             return false;
         char *endptr{};
         T val;

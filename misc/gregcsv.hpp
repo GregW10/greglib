@@ -97,7 +97,24 @@ namespace gtd {
             }
         }
         void push(const T &_num) {
-            
+            if (this->_v)
+                this->_v->emplace_back(_num);
+            if (_num != _num) {
+                this->_s->emplace_back("nan");
+                return;
+            }
+            char *buffer = new char[128];
+            this->_to_free.emplace_back(buffer);
+            int chars_written;
+            if constexpr (std::same_as<T, float>)
+                chars_written = snprintf(buffer, 128, "%f", _num);
+            if constexpr (std::same_as<T, double>)
+                chars_written = snprintf(buffer, 128, "%lf", _num);
+            if constexpr (std::same_as<T, long double>)
+                chars_written = snprintf(buffer, 128, "%Lf", _num);
+            if (chars_written > this->_lf)
+                this->_lf = chars_written;
+            this->_s->emplace_back(buffer);
         }
         char *operator()(uint64_t sindex) { // no bounds-checking
             return this->_s->operator[](sindex);
@@ -233,7 +250,7 @@ namespace gtd {
                 }
             } while (++send != fend);
             if (options & conv_num) {
-                std::istringstream iss;
+                std::istringstream iss; // remove the use of a string stream and instead use your float-conversion function
                 T val;
                 uint64_t nl_m1 = this->nl - 1;
                 char **cptr;
@@ -333,6 +350,14 @@ namespace gtd {
         static constexpr int prelimfp = 8; // if set, perform a forward-pass over column first to check if all values can be converted, before allocating memory - requires "conv_num"
         explicit csv(const char *path, int options = read_hdr | conv_num) {
             this->load_csv(path, options);
+        }
+        csv_col<T> &operator[](const char *field) {
+            if (!field)
+                throw std::invalid_argument{"Error: field name cannot be nullptr.\n"};
+            for (csv_col<T> &_col : this->_cols)
+                if (gtd::str_eq(field, _col._name))
+                    return _col;
+            throw std::invalid_argument{"Error: field passed doesn't exist.\n"};
         }
         // template <std::floating_point U>
         friend std::ostream &operator<<(std::ostream &os, const csv<T> &f) {
