@@ -49,5 +49,12 @@ int main() {
 
     std::cout << j << std::endl;
 
+    uint64_t x = 2;
+    uint64_t y = 3;
+
+    uint64_t res = x - y;
+
+    std::cout << std::dec << "res: " << res << std::endl;
+
     return 0;
 }

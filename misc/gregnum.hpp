@@ -55,6 +55,10 @@ namespace gtd {
             if (&other == this) {
                 // multiply by 2
             }
+            if (this->neg) {
+                // if (other.neg)
+
+            }
             add_to_existing(this->data, other.data.data(), other.data.size());
             return *this;
         }
