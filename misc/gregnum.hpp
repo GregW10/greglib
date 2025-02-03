@@ -36,10 +36,20 @@ namespace gtd {
                 carry = res < *dptr || res < *to_add++;
                 *dptr++ = res;
             }
-            if (carry)
-                *dptr = 1;
+            if (carry) {
+                while (*dptr == big) ++dptr;
+                *dptr += carry;
+            }
         }
-        static void sub_from_existing(std::vector<uint64_t> &dat, const uint64_t *to_sub, uint64_t size);
+        static void sub_from_existing(std::vector<uint64_t> &dat, const uint64_t *to_sub, uint64_t size) {
+            if (size > dat.size()) {
+                if (size - 1 > dat.size()) {
+                    this->neg = !this->neg;
+                } else {
+
+                }
+            }
+        }
     public:
         big_integer() : data{std::initializer_list<uint64_t>{0}} {}
         big_integer(uint64_t num, bool negative = false) : neg{negative}, data{std::initializer_list<uint64_t>{num}} {}
@@ -54,6 +64,7 @@ namespace gtd {
         big_integer &operator+=(const big_integer &other) {
             if (&other == this) {
                 // multiply by 2
+                return *this;
             }
             if (this->neg) {
                 // if (other.neg)
@@ -70,6 +81,8 @@ namespace gtd {
         friend std::ostream &operator<<(std::ostream &os, const big_integer &bi) {
             // if (!bi)
             //     return os << '0';
+            std::basic_ios<char> ios{nullptr};
+            ios.copyfmt(os);
             if (bi.neg)
                 os << '-';
             os << std::hex;
@@ -84,7 +97,8 @@ namespace gtd {
             if (counter == big)
                 return os << '0';
             while (counter --> 0)
-                os << *dptr--;
+                os << *dptr-- << std::setfill('0') << std::setw(16);
+            os.copyfmt(ios);
             return os;
         }
     };

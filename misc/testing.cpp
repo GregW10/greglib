@@ -19,33 +19,15 @@ int main() {
 
     printf("%d\n", c);
 */
-    std::cout << j << " + " << i << " = ";
+    unsigned int c = 1'000'000;
 
-    j += i;
+    while (c --> 0) {
+        std::cout << c << std::flush << "\r";
+        j += i;
 
-    std::cout << j << std::endl;
+    }
 
-        std::cout << j << " + " << i << " = ";
-
-    j += i;
-
-    std::cout << j << std::endl;
-
-        std::cout << j << " + " << i << " = ";
-
-    j += i;
-
-    std::cout << j << std::endl;
-
-        std::cout << j << " + " << i << " = ";
-
-    j += i;
-
-    std::cout << j << std::endl;
-
-        std::cout << j << " + " << i << " = ";
-
-    j += i;
+    std::cout << std::endl;
 
     std::cout << j << std::endl;
 
@@ -54,7 +36,16 @@ int main() {
 
     uint64_t res = x - y;
 
+    std::cout << "What the fuck" << std::endl;
+
     std::cout << std::dec << "res: " << res << std::endl;
+
+    x = 0b11111111;
+    y = 0b1000000000;
+
+    res = y - x;
+
+    std::cout << res << std::endl;
 
     return 0;
 }
