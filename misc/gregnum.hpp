@@ -6,13 +6,14 @@
 #include <cstdint>
 #include <iostream>
 #include <iomanip>
+#include <unistd.h>
 
 namespace gtd {
     class big_integer {
         bool neg = false;
         // bool zero = true;
         std::vector<uint64_t> data;
-        constexpr static uint64_t half = 0x0fffffffffffffff;
+        constexpr static uint64_t half = 0x7fffffffffffffff;
         constexpr static uint64_t big  = 0xffffffffffffffff;
         static void add_to_existing(std::vector<uint64_t> &dat, const uint64_t *to_add, uint64_t size) {
             // std::cout << dat.size() << ", " << size << std::endl;
@@ -60,16 +61,36 @@ namespace gtd {
                 return;
             std::vector<uint64_t> org{dat};
             uint64_t cby = by;
+            uint64_t mask = 1;
             char shift;
             do {
-                shift = 0;
-                cby = by;
-                do {
                     cby >>= 1;
-                    ++shift;
-                } while (cby);
-
-            } while(by);
+                    mask <<= 1;
+                    single_shift_left(dat);
+            } while (cby > 1);
+            // std::cout << "got here" << std::endl;
+            bool bye = false;
+            do {
+                std::vector<uint64_t> ss{org};
+                shift = 0;
+                cby = by - mask;
+                mask = 1;
+                //std::cout << "cby: " << cby << ", mask: " << mask << std::endl;
+                // usleep(10000);
+                if (!cby)
+                    return;
+                if (cby == 1) {
+                    add_to_existing(dat, ss.data(), ss.size());
+                    return;
+                }
+                while (cby > 1) {
+                    cby >>= 1;
+                    shift += 1;
+                    single_shift_left(ss);
+                }
+                add_to_existing(dat, ss.data(), ss.size());
+                mask += (1 << shift);
+            } while(1);
         }
         static void single_shift_left(std::vector<uint64_t> &dat) {
             constexpr static uint64_t mask = half + 1;
@@ -82,11 +103,14 @@ namespace gtd {
             }
             if (dat.back() > half)
                 dat.push_back(1);
-            uint64_t *end = dat.data() + s - 1;
+            uint64_t *start = dat.data();
+            uint64_t *end = start + s - 1;
             uint64_t *bend = end - 1;
-            while (--s > 0) {
+            while (true) {
                 *end <<= 1;
-                if (*bend-- & mask)
+                if (end == start)
+                    return;
+                if (*bend-- > half)
                     *end += 1;
                 --end;
             }
@@ -115,6 +139,10 @@ namespace gtd {
 
             }
             add_to_existing(this->data, other.data.data(), other.data.size());
+            return *this;
+        }
+        big_integer &operator*=(uint64_t val) {
+            this->mult_by_single(this->data, val);
             return *this;
         }
         operator bool() const noexcept {

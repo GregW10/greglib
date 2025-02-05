@@ -3,10 +3,16 @@
 
 int main() {
 
-    gtd::big_integer i(0x0fffffffffffffffull);
+    uint64_t val = 0x9f38ed82ac;
+
+    std::cout << std::hex << val << std::dec << std::endl;
+
+    gtd::big_integer i(0x0fffffffffffffefull);
     gtd::big_integer j(0x0fffffffffffffffull);
 
-    std::cout << j << std::endl;
+    std::cout << i << std::endl;
+
+    // std::cout << j << std::endl;
 
     j += 1;
 
