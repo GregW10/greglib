@@ -6,6 +6,32 @@ int main() {
     gtd::big_integer i(0x0fffffffffffffffull);
     gtd::big_integer j(0x0fffffffffffffffull);
 
+    std::cout << j << std::endl;
+
+    j += 1;
+
+    std::cout << j << std::endl;
+
+    j.shift_left();
+
+    std::cout << j << std::endl;
+
+        j.shift_left();
+
+    std::cout << j << std::endl;
+
+        j.shift_left();
+
+    std::cout << j << std::endl;
+
+        j.shift_left();
+
+    std::cout << j << std::endl;
+
+        j.shift_left();
+
+    std::cout << j << std::endl;
+
     char n = 49;
 /*
     printf("n = %x\n", n);
@@ -19,7 +45,7 @@ int main() {
 
     printf("%d\n", c);
 */
-    unsigned int c = 1'000'000;
+    unsigned int c = 1'000;
 
     while (c --> 0) {
         std::cout << c << std::flush << "\r";

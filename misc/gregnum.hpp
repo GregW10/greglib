@@ -44,15 +44,59 @@ namespace gtd {
         static void sub_from_existing(std::vector<uint64_t> &dat, const uint64_t *to_sub, uint64_t size) {
             if (size > dat.size()) {
                 if (size - 1 > dat.size()) {
-                    this->neg = !this->neg;
+                    // this->neg = !this->neg;
                 } else {
 
                 }
             }
         }
+        static void mult_by_single(std::vector<uint64_t> &dat, uint64_t by) {
+            if (!by) {
+                dat.resize(1);
+                dat[0] = 0;
+                return;
+            }
+            if (by == 1)
+                return;
+            std::vector<uint64_t> org{dat};
+            uint64_t cby = by;
+            char shift;
+            do {
+                shift = 0;
+                cby = by;
+                do {
+                    cby >>= 1;
+                    ++shift;
+                } while (cby);
+
+            } while(by);
+        }
+        static void single_shift_left(std::vector<uint64_t> &dat) {
+            constexpr static uint64_t mask = half + 1;
+            uint64_t s = dat.size();
+            if (s == 1) {
+                if (dat[0] > half)
+                    dat.push_back(1);
+                dat[0] <<= 1;
+                return;
+            }
+            if (dat.back() > half)
+                dat.push_back(1);
+            uint64_t *end = dat.data() + s - 1;
+            uint64_t *bend = end - 1;
+            while (--s > 0) {
+                *end <<= 1;
+                if (*bend-- & mask)
+                    *end += 1;
+                --end;
+            }
+        }
     public:
         big_integer() : data{std::initializer_list<uint64_t>{0}} {}
         big_integer(uint64_t num, bool negative = false) : neg{negative}, data{std::initializer_list<uint64_t>{num}} {}
+        void shift_left() {
+            single_shift_left(this->data);
+        }
         big_integer &operator+=(uint64_t num) {
             if (this->neg) {
                 this->sub_from_existing(this->data, &num, 1);
@@ -63,7 +107,7 @@ namespace gtd {
         }
         big_integer &operator+=(const big_integer &other) {
             if (&other == this) {
-                // multiply by 2
+                single_shift_left(this->data); // multiply by two
                 return *this;
             }
             if (this->neg) {
