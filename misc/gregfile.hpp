@@ -51,7 +51,7 @@ namespace gtd {
                 while (1) {
                     if ((readd = ::read(this->fd, out, 8192)) == -1)
                         return false;
-                    std::cout << "between" << std::endl;
+                    // std::cout << "between" << std::endl;
                     if (!readd) // means EOF was reached
                         return true;
                     out += readd;
