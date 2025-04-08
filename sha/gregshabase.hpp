@@ -50,6 +50,15 @@ namespace gtd {
     uint32_t sigma1_512(uint32_t x) {
         return rotr(x, 19) ^ rotr(x, 61) ^ (x >> 6);
     }
+    bool sha256_memcpy(uint32_t *dst, const char *src, uint64_t nwords) {
+        if (!dst || !src || !nwords)
+            return false;
+        while (nwords --> 0) {
+            *dst++ = (*src << 24) + (*(src + 1) << 16) + (*(src + 2) << 8) + *(src + 3);
+            src += 4;
+        }
+        return true;
+    }
     class shasum {
     protected:
         uint64_t _size = 0;
