@@ -2,18 +2,18 @@
 #define GREGSHABASE_HPP
 
 #include <cstdint>
-#include <concept>
+#include <concepts>
 #include <cinttypes>
 
 namespace gtd {
-    template <std::is_fundamental T>
-    void rotr(T v, uint64_t n) {
+    template <std::integral T>
+    T rotr(T v, uint64_t n) {
         static const size_t w = sizeof(T)*8;
         n = n % w;
         return (v >> n) | (v << (w - n));
     }
-    template <std::is_fundamental T>
-    void rotl(T v, uint64_t n) {
+    template <std::integral T>
+    T rotl(T v, uint64_t n) {
         static const size_t w = sizeof(T)*8;
         n = n % w;
         return (v << n) | (v >> (w - n));

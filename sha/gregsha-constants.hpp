@@ -69,7 +69,7 @@ namespace gtd {
         0xa4506ceb,
         0xbef9a3f7,
         0xc67178f2
-    }
+    };
     const uint32_t sha256_init_hash_vals[] = {
         0x6a09e667,
         0xbb67ae85,

@@ -3,7 +3,12 @@ cmake-build-debug/
 
 *.tsr
 *.sh
+*.pdf
+*.dat
+*.sha256
+*.sha512
 
 CMakeLists.txt
 main
 test
+t
