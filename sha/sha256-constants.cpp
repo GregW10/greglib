@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <vector>
 #include <cmath>
+#include <bit>
 
 uint64_t to_uint(const char *str) {
     if (!str || !*str)
@@ -62,6 +63,25 @@ void output(uint64_t i) {
     uint32_t v = _di[3] + (_di[4] << 8) + (_di[5] << 16) + (_di[6] << 24); */
     // std::cout << i << ": " << _d << " -> " << std::hex << _di << " -> " << v << std::dec << '\n';
     // std::cout << i << ": " << std::hex << v << std::dec << '\n';
+    if constexpr (std::endian::native == std::endian::little) {
+        uint32_t temp;
+        temp = (cb & 0x000000ff);
+        temp <<= 8;
+        temp += (cb & 0x0000ff00) >> 8;
+        temp <<= 8;
+        temp += (cb & 0x00ff0000) >> 16;
+        temp <<= 8;
+        temp += cb >> 24;
+        cb = temp;
+        temp = (sq & 0x000000ff);
+        temp <<= 8;
+        temp += (sq & 0x0000ff00) >> 8;
+        temp <<= 8;
+        temp += (sq & 0x00ff0000) >> 16;
+        temp <<= 8;
+        temp += sq >> 24;
+        sq = temp;
+    }
     printf("%08" PRIx32 " %08" PRIx32 "\n", cb, sq);
 }
 

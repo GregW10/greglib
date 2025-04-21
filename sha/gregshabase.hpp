@@ -1,6 +1,7 @@
 #ifndef GREGSHABASE_HPP
 #define GREGSHABASE_HPP
 
+#include <bit>
 #include <cstdint>
 #include <concepts>
 #include <cinttypes>
@@ -8,13 +9,13 @@
 namespace gtd {
     template <std::integral T>
     T rotr(T v, uint64_t n) {
-        static const size_t w = sizeof(T)*8;
+        static constexpr size_t w = sizeof(T)*8;
         n = n % w;
         return (v >> n) | (v << (w - n));
     }
     template <std::integral T>
     T rotl(T v, uint64_t n) {
-        static const size_t w = sizeof(T)*8;
+        static constexpr size_t w = sizeof(T)*8;
         n = n % w;
         return (v << n) | (v >> (w - n));
     }
@@ -59,6 +60,21 @@ namespace gtd {
         }
         return true;
     }
+    consteval bool little_endian() {
+        static_assert(std::endian::native == std::endian::little ||
+                      std::endian::native == std::endian::big,
+                      "Unrecognised endianness!\n"
+        );
+        return std::endian::native != std::endian::little;
+    }
+    void print_hex(const void *data, uint64_t size) {
+        if (!data || !size)
+            return;
+        const unsigned char *ptr = (const unsigned char *) data;
+        while (size --> 0)
+            printf("%02x", *ptr++);
+        putchar('\n');
+    }
     class shasum {
     protected:
         uint64_t _size = 0;
@@ -70,6 +86,10 @@ namespace gtd {
         virtual char *digest() const noexcept = 0;
         virtual char *hexdigest() const noexcept = 0;
         virtual void reset() noexcept = 0;
+    };
+    template <uint16_t N>
+    class sha_const {
+
     };
 }
 #endif

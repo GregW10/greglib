@@ -8,23 +8,14 @@
 namespace gtd {
     class sha256 { // : public shasum {
         uint64_t _size = 0; // total number of bytes of data seen so far
-        bool _done = false;
-        uint32_t _H[8] = {
-            0x6a09e667,
-            0xbb67ae85,
-            0x3c6ef372,
-            0xa54ff53a,
-            0x510e527f,
-            0x9b05688c,
-            0x1f83d9ab,
-            0x5be0cd19,
-        };
-        uint32_t _M[16];
-        uint32_t _W[64];
-        char  _par[64]; // partially-filled block
-        char *_nbyte = (char *) _par;
-        unsigned char _npos = 0;
-        void copy_block(const char *dat) {
+        bool     _done = false;
+        uint32_t _H[8]; // initial hash values - initialised in "init_hash_vals" -> depends on endianness of system
+        uint32_t _M[16]; // message block
+        uint32_t _W[64]; // message schedule
+        unsigned char _par[64]{}; // partially-filled block
+        unsigned char *_nbyte = (unsigned char *) _par; // pointer to the next char to assign in the partially-filled block
+        unsigned char _npos = 0; // position of the next char to assign in the partially-filled block
+        void copy_block(const unsigned char *dat) {
             uint32_t *mptr = _M;
             uint32_t *wptr = _W;
             char counter = 16;
@@ -60,7 +51,7 @@ namespace gtd {
 
             }
         } */
-        void process_block(const char *data) {
+        void process_block(const unsigned char *data) {
             copy_block(data);
             char counter = 48;
             uint32_t *wptr = ((uint32_t *) _W) + 16;
@@ -77,7 +68,11 @@ namespace gtd {
             uint32_t g = _H[6];
             uint32_t h = _H[7];
             counter = 64;
-            const uint32_t *kptr = sha256_constants;
+            const uint32_t *kptr;
+            if constexpr (little_endian())
+                kptr = sha256_constants_le;
+            else
+                kptr = sha256_constants_be;
             wptr = (uint32_t *) _W;
             uint32_t T1;
             uint32_t T2;
@@ -92,7 +87,7 @@ namespace gtd {
                 c = b;
                 b = a;
                 a = T1 + T2;
-                std::cout << "va" << std::endl;
+                // std::cout << "va" << std::endl;
             }
             _H[0] += a;
             _H[1] += b;
@@ -102,10 +97,10 @@ namespace gtd {
             _H[5] += f;
             _H[6] += g;
             _H[7] += h;
-                for (int i = 0; i < 8; ++i)
-                    std::cout << std::hex << _H[i] << std::endl;
+                /* for (int i = 0; i < 8; ++i)
+                    std::cout << std::hex << _H[i] << std::endl; */
         }
-        void process_data(const char *data, uint64_t size) {
+        void process_data(const unsigned char *data, uint64_t size) {
             _size += size;
             uint64_t bytes = _npos + size;
             if (bytes < 64) {
@@ -122,7 +117,7 @@ namespace gtd {
                 process_block(_par);
                 _npos += (size % 64);
                 _npos = _npos % 64; // WATCH OUT
-                _nbyte = ((char *) _par) + _npos;
+                _nbyte = ((unsigned char *) _par) + _npos;
                 N = (bytes - N)/64;
             } else
                 N = bytes / 64;
@@ -147,13 +142,15 @@ namespace gtd {
             _nbyte = ((char *) _nblock) + bytes;
             _npos = bytes; */
         }
-        void finish() {
+        void finish() { // leaves object in an unusable state
+            print_hex(_par, 64);
             if (_npos < 55) {
-                *_nbyte++ = 0b10000000;
+                *_nbyte++ = 0b10000000; // WRONG!
                 ++_npos;
                 bye:
                 while (_npos++ < 56)
                     *_nbyte++ = 0;
+                _size *= 8;
                 _par[56] = (_size >> 56);
                 _par[57] = (_size >> 48);
                 _par[58] = (_size >> 40);
@@ -162,6 +159,7 @@ namespace gtd {
                 _par[61] = (_size >> 16);
                 _par[62] = (_size >> 8);
                 _par[63] =  _size;
+                print_hex(_par, 64);
                 process_block(_par);
                 _done = true;
                 return;
@@ -172,30 +170,60 @@ namespace gtd {
                 *_nbyte++ = 0;
                 ++_npos;
             }
+            print_hex(_par, 64);
             process_block(_par);
             _nbyte = _par;
             _npos = 0;
             goto bye;
         }
+        void init_hash_vals() {
+            if constexpr (little_endian()) {
+                _H[0] = sha256_init_hash_vals_le[0];
+                _H[1] = sha256_init_hash_vals_le[1];
+                _H[2] = sha256_init_hash_vals_le[2];
+                _H[3] = sha256_init_hash_vals_le[3];
+                _H[4] = sha256_init_hash_vals_le[4];
+                _H[5] = sha256_init_hash_vals_le[5];
+                _H[6] = sha256_init_hash_vals_le[6];
+                _H[7] = sha256_init_hash_vals_le[7];
+
+            } else {
+                _H[0] = sha256_init_hash_vals_be[0];
+                _H[1] = sha256_init_hash_vals_be[1];
+                _H[2] = sha256_init_hash_vals_be[2];
+                _H[3] = sha256_init_hash_vals_be[3];
+                _H[4] = sha256_init_hash_vals_be[4];
+                _H[5] = sha256_init_hash_vals_be[5];
+                _H[6] = sha256_init_hash_vals_be[6];
+                _H[7] = sha256_init_hash_vals_be[7];
+            }
+        }
     public:
-        sha256() = default;
+        sha256() {
+            init_hash_vals();
+        }
         sha256(const char *data, uint64_t size) {
+            init_hash_vals();
             if (!data || !size)
                 return;
-            process_data(data, size);
+            process_data((unsigned char *) data, size);
         }
         void add_data(const char *data, uint64_t size) noexcept {
+            init_hash_vals();
             if (!data || !size || _done)
                 return;
-            process_data(data, size);
+            process_data((unsigned char *) data, size);
         }
         const char *digest() noexcept {
             static unsigned char _digest[32];
             if (_done)
                 return (char *) _digest;
             finish();
+            // std::cout << "Inside digest!\n";
+            // for (int i = 0; i < 8; ++i)
+                // std::cout << std::hex << _H[i] << std::endl;
             unsigned char *dptr = _digest;
-            unsigned char *hptr = (unsigned char *) _H;
+            uint32_t *hptr = (uint32_t *) _H;
             char counter = 8;
             while (counter --> 0) {
                 *dptr++ = (*hptr >> 24);
