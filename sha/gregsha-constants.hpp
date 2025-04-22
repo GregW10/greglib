@@ -1,10 +1,15 @@
 #ifndef GREGSHACONST_HPP
 #define GREGSHACONST_HPP
 
+/* SHA-256 CONSTANTS
+ * ****************************************
+ * Generated using "./sha256-constants.cpp"
+ */
+
 #include <cstdint>
 
 namespace gtd {
-    const uint32_t sha256_constants_be[] = {
+    const uint32_t sha256_constants[] = {
         0x428a2f98,
         0x71374491,
         0xb5c0fbcf,
@@ -70,7 +75,7 @@ namespace gtd {
         0xbef9a3f7,
         0xc67178f2
     };
-    const uint32_t sha256_constants_le[] = {
+    /* const uint32_t sha256_constants_le[] = {
         0x982f8a42,
         0x91443771,
         0xcffbc0b5,
@@ -135,8 +140,8 @@ namespace gtd {
         0xeb6c50a4,
         0xf7a3f9be,
         0xf27871c6,
-    };
-    const uint32_t sha256_init_hash_vals_be[] = {
+    }; */
+    const uint32_t sha256_init_hash_vals[] = {
         0x6a09e667,
         0xbb67ae85,
         0x3c6ef372,
@@ -146,7 +151,7 @@ namespace gtd {
         0x1f83d9ab,
         0x5be0cd19,
     };
-    const uint32_t sha256_init_hash_vals_le[] = {
+    /* const uint32_t sha256_init_hash_vals_le[] = {
         0x67e6096a,
         0x85ae67bb,
         0x72f36e3c,
@@ -155,6 +160,6 @@ namespace gtd {
         0x8c68059b,
         0xabd9831f,
         0x19cde05b,
-    };
+    }; */
 }
 #endif

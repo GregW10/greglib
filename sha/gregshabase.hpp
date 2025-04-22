@@ -21,7 +21,7 @@ namespace gtd {
     }
     template <std::integral T> requires (sizeof(T) == 4 || sizeof(T) == 8)
     T ch(T x, T y, T z) {
-        return (x & y) ^ (x & z);
+        return (x & y) ^ (~x & z);
     }
     template <std::integral T> requires (sizeof(T) == 4 || sizeof(T) == 8)
     T maj(T x, T y, T z) {
@@ -39,16 +39,16 @@ namespace gtd {
     uint32_t sigma1_256(uint32_t x) {
         return rotr(x, 17) ^ rotr(x, 19) ^ (x >> 10);
     }
-    uint32_t Sigma0_512(uint32_t x) {
+    uint64_t Sigma0_512(uint64_t x) {
         return rotr(x, 28) ^ rotr(x, 34) ^ rotr(x, 39);
     }
-    uint32_t Sigma1_512(uint32_t x) {
+    uint64_t Sigma1_512(uint64_t x) {
         return rotr(x, 14) ^ rotr(x, 18) ^ rotr(x, 41);
     }
-    uint32_t sigma0_512(uint32_t x) {
+    uint64_t sigma0_512(uint64_t x) {
         return rotr(x, 1) ^ rotr(x, 8) ^ (x >> 7);
     }
-    uint32_t sigma1_512(uint32_t x) {
+    uint64_t sigma1_512(uint64_t x) {
         return rotr(x, 19) ^ rotr(x, 61) ^ (x >> 6);
     }
     bool sha256_memcpy(uint32_t *dst, const char *src, uint64_t nwords) {
@@ -65,7 +65,7 @@ namespace gtd {
                       std::endian::native == std::endian::big,
                       "Unrecognised endianness!\n"
         );
-        return std::endian::native != std::endian::little;
+        return std::endian::native == std::endian::little;
     }
     void print_hex(const void *data, uint64_t size) {
         if (!data || !size)
