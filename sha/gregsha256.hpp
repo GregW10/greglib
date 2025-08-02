@@ -190,27 +190,27 @@ namespace gtd {
         }
     public:
         sha256() = default;
-        sha256(const char *data, uint64_t size, bool _hash = false) {
+        sha256(const unsigned char *data, uint64_t size, bool _hash = false) {
             if (!data || !size)
                 return;
-            _process_data((unsigned char *) data, size);
+            _process_data(data, size);
             if (_hash)
                 this->_finish();
         }
-        bool add_data(const char *data, uint64_t size) noexcept {
+        bool add_data(const unsigned char *data, uint64_t size) noexcept {
             if (!data || !size || _done)
                 return false;
-            _process_data((unsigned char *) data, size);
+            _process_data(data, size);
             return true;
         }
         void hash() noexcept {
             if (!this->_done)
                 this->_finish();
         }
-        const char *digest() noexcept {
+        const unsigned char *digest() noexcept {
             if (!_done)
                 this->_finish();
-            return (char *) _digest;
+            return _digest;
         }
         void reset() noexcept {
             _done = false;
