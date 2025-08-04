@@ -2,6 +2,7 @@
 #define GREGSHA256_HPP
 
 #include <cstring>
+#include <iostream>
 #include "gregshabase.hpp"
 #include "gregsha-constants.hpp"
 
@@ -190,17 +191,17 @@ namespace gtd {
         }
     public:
         sha256() = default;
-        sha256(const unsigned char *data, uint64_t size, bool _hash = false) {
+        sha256(const void *data, uint64_t size, bool _hash = false) {
             if (!data || !size)
                 return;
-            _process_data(data, size);
+            _process_data((unsigned char *) data, size);
             if (_hash)
                 this->_finish();
         }
-        bool add_data(const unsigned char *data, uint64_t size) noexcept {
+        bool add_data(const void *data, uint64_t size) noexcept {
             if (!data || !size || _done)
                 return false;
-            _process_data(data, size);
+            _process_data((unsigned char *) data, size);
             return true;
         }
         void hash() noexcept {
